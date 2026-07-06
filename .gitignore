@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# misc
+.DS_Store
+node_modules/
+.env.local
+
+# old build artifacts
+dist/
+.next/
+src/
+server/
+vite.config.ts
+tsconfig.json

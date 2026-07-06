@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitReplay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="navbar-inner">
+        <div class="navbar-brand">
+          <span class="logo">GitReplay</span>
+        </div>
+
+        <div id="header-repo" class="navbar-search hidden">
+          <input
+            id="repo-input"
+            type="text"
+            placeholder="github.com/user/repo"
+            autocomplete="off"
+          />
+          <button id="start-btn" type="button" class="btn btn-primary">Load</button>
+        </div>
+
+        <div class="navbar-actions">
+          <div id="nav-tools" class="nav-tools hidden">
+            <button id="replay-all-btn" type="button" class="btn">Replay All</button>
+            <div id="race-controls" class="race-controls">
+              <select id="race-kind-select" class="race-select" title="Race file type">
+                <option value="html">HTML</option>
+                <option value="js">JS</option>
+                <option value="css">CSS</option>
+              </select>
+              <button id="race-btn" type="button" class="btn">Race</button>
+            </div>
+            <button id="replay-btn" type="button" class="btn" disabled title="Replay what you just watched">Replay</button>
+          </div>
+          <button id="token-settings-btn" type="button" class="btn btn-ghost btn-secure hidden" title="Change GitHub token">
+            <svg class="icon-secure" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span class="btn-secure-label">Token</span>
+            <svg class="icon-secure-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </button>
+          <div id="replay-controls" class="replay-controls hidden">
+            <button id="play-pause-btn" type="button" class="btn">Pause</button>
+            <div class="replay-sliders">
+              <div class="replay-slider-row">
+                <span class="replay-slider-label">Speed</span>
+                <input id="speed-slider" type="range" min="0" max="100" step="1" value="11" title="Replay speed" />
+                <span id="speed-label">1x</span>
+              </div>
+              <div class="replay-slider-row">
+                <span class="replay-slider-label">Progress</span>
+                <input id="progress-slider" type="range" min="0" max="1000" step="1" value="0" disabled title="Seek within current file" />
+                <span id="progress-label">0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="error-banner" class="error-banner hidden"></div>
+
+    <main id="welcome" class="welcome">
+      <div id="welcome-token" class="welcome-screen hidden">
+        <h1 class="welcome-heading" id="welcome-token-heading">GitHub token</h1>
+        <p class="welcome-lead" id="welcome-token-sub">Optional. Stored in this tab only — cleared when you close it.</p>
+        <div class="welcome-bar">
+          <input
+            id="token-input"
+            type="password"
+            placeholder="ghp_..."
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="GitHub personal access token"
+          />
+          <button id="token-btn" type="button" class="btn btn-primary">Save</button>
+        </div>
+        <p class="welcome-note">
+          <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">Create a token</a>
+          <span aria-hidden="true">·</span>
+          no scopes required
+        </p>
+        <button id="token-skip-btn" type="button" class="welcome-back">Back</button>
+      </div>
+      <div id="welcome-repo" class="welcome-screen">
+        <h1 class="welcome-heading">Load a repository</h1>
+        <p class="welcome-lead">Paste a GitHub URL, then double-click any file to watch it build live.</p>
+        <div class="welcome-bar">
+          <input
+            id="repo-welcome-input"
+            type="text"
+            placeholder="github.com/user/repo"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Repository URL"
+          />
+          <button id="repo-welcome-btn" type="button" class="btn btn-primary">Load</button>
+        </div>
+        <p class="welcome-note">Public repositories only</p>
+      </div>
+    </main>
+
+    <main id="workspace" class="workspace hidden">
+      <section class="panel panel-files">
+        <div class="panel-head">
+          <span class="panel-title">Files</span>
+          <span id="repo-name" class="panel-meta"></span>
+        </div>
+        <div id="file-tree" class="file-tree"></div>
+        <div id="timeline" class="timeline hidden">
+          <div class="timeline-row">
+            <button id="prev-step-btn" type="button" class="btn btn-sm" disabled>Prev</button>
+            <span id="step-counter">—</span>
+            <button id="next-step-btn" type="button" class="btn btn-sm" disabled>Next</button>
+          </div>
+          <p id="step-info" class="step-info"></p>
+          <div class="timeline-lists">
+            <div>
+              <span class="label">Done</span>
+              <div id="prev-files" class="mini-list"></div>
+            </div>
+            <div>
+              <span class="label">Next</span>
+              <div id="upcoming-files" class="mini-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="resize-handle" data-index="0" title="Drag to resize"></div>
+
+      <section class="panel panel-code">
+        <div class="panel-head">
+          <span class="panel-title">Code</span>
+          <span id="code-path" class="panel-meta">—</span>
+        </div>
+        <div id="code-viewer" class="code-viewer">
+          <p class="empty">Double-click a file to build it live</p>
+        </div>
+      </section>
+
+      <div class="resize-handle" data-index="1" title="Drag to resize"></div>
+
+      <section id="preview-panel" class="panel panel-preview">
+        <div class="panel-head panel-head-preview">
+          <span class="panel-title">Live preview</span>
+          <div class="panel-head-end">
+            <span id="preview-status" class="panel-meta">—</span>
+            <button
+              id="preview-fullscreen-btn"
+              type="button"
+              class="btn btn-ghost btn-icon"
+              title="Fullscreen"
+              aria-label="Fullscreen preview"
+              aria-pressed="false"
+            >
+              <svg class="icon-enter-fullscreen" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+                <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+                <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+                <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+              </svg>
+              <svg class="icon-exit-fullscreen hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+                <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+                <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+                <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="preview-wrap">
+          <iframe id="preview-frame" title="Live preview" sandbox="allow-scripts allow-same-origin"></iframe>
+          <div id="preview-empty" class="preview-empty">
+            <p>Double-click HTML, CSS, JS, or React/TSX to build the live site here.</p>
+          </div>
+          <div id="preview-building" class="preview-building hidden" aria-live="polite">
+            <span class="preview-building-spinner" aria-hidden="true"></span>
+            <span>Building...</span>
+          </div>
+        </div>
+        <div id="preview-replay-dock" class="preview-replay-dock" aria-label="Replay controls"></div>
+      </section>
+    </main>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
