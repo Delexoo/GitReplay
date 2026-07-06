@@ -1,286 +1,222 @@
 <p align="center">
   <strong>GitReplay</strong><br />
-  A public web app to load any GitHub repository and watch files build live — with real-time website preview.
+  Watch any public GitHub repository build live in your browser.
 </p>
 
 <p align="center">
-  <a href="https://delexoo.github.io/GitReplay/"><img src="https://img.shields.io/badge/live-app-111?style=for-the-badge" alt="Live app" /></a>
-  <a href="https://github.com/Delexoo/GitReplay"><img src="https://img.shields.io/github/stars/Delexoo/GitReplay?style=flat-square" alt="Stars" /></a>
-  <img src="https://img.shields.io/badge/auth-session--only-blue?style=flat-square" alt="Session auth" />
-  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" />
+  <a href="https://delexoo.github.io/GitReplay/"><img src="https://img.shields.io/badge/Open%20GitReplay-111?style=for-the-badge" alt="Open GitReplay" /></a>
 </p>
 
 <p align="center">
-  <a href="https://delexoo.github.io/GitReplay/"><strong>→ Open GitReplay</strong></a>
+  <a href="https://delexoo.github.io/GitReplay/"><strong>delexoo.github.io/GitReplay</strong></a>
 </p>
 
 ---
 
-## Table of contents
+## What is GitReplay?
 
-- [Live app](#live-app)
-- [Overview](#overview)
-- [Features](#features)
-- [Session authentication](#session-authentication)
-- [How to use](#how-to-use)
-- [How it works](#how-it-works)
-- [Live preview](#live-preview)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [License](#license)
+GitReplay lets you paste a public GitHub repo and watch its files appear as if someone is typing them in real time — with a **live website preview** on the right for HTML, CSS, JS, and React/Vite projects.
+
+Open the app in your browser. Nothing to download or install.
 
 ---
 
-## Live app
+## Quick start
 
-**[https://delexoo.github.io/GitReplay/](https://delexoo.github.io/GitReplay/)**
-
-No install. No server to run. Open the link, connect your GitHub token for the current tab session (optional but recommended), paste a public repo URL, and start replaying.
-
----
-
-## Overview
-
-**GitReplay** turns a GitHub repository into an interactive studio:
-
-1. Paste a repo URL (`github.com/owner/repo`)
-2. Browse the file tree
-3. **Double-click** any file to watch it type out character-by-character
-4. See the **live preview** update as HTML, CSS, and JS/TSX build
-
-Everything runs in your browser. GitReplay never stores your token on a server.
-
-<p align="center">
-  <em>Built for demos, learning, walkthroughs, and “how was this built?” moments.</em>
-</p>
+1. Go to **[delexoo.github.io/GitReplay](https://delexoo.github.io/GitReplay/)**
+2. *(Recommended)* Click **Connect GitHub for this session** and paste a [personal access token](https://github.com/settings/tokens/new) — no scopes needed for public repos
+3. Paste a repo URL (e.g. `github.com/vitejs/vite`) and click **Load**
+4. **Single-click** a file to read it · **Double-click** to replay it live
 
 ---
 
-## Features
+## The interface
 
-| Area | What you get |
-|------|----------------|
-| **Zero setup** | Public web app — just open the URL |
-| **Session auth** | GitHub token stored in `sessionStorage` for the current tab only |
-| **Repo loading** | Paste `github.com/owner/repo`, `owner/repo`, or a full clone URL |
-| **File tree** | Collapsible tree with folder memory |
-| **Live replay** | Character-by-character typing, speed 0.25× – 100,000× |
-| **Progress scrubber** | Seek within a file or across **Replay All** |
-| **Parallel web build** | HTML + CSS + JS/TSX replay together |
-| **Framework preview** | Vite / React / TypeScript bundled in-browser (esbuild-wasm) |
-| **Authentic preview** | Built `dist/` output via jsDelivr when available |
-| **Race mode** | Multiple files of the same type race to finish |
-| **Fullscreen preview** | Expand preview; replay controls dock to the bottom |
-| **Media preview** | Images, video, and audio in the preview panel |
+GitReplay has three main panels:
+
+| Panel | What it does |
+|-------|----------------|
+| **Files** | Repo file tree — click folders to expand, click files to browse |
+| **Code** | Shows file contents; animates during replay |
+| **Live preview** | Renders the site as web files are built |
+
+Drag the dividers between panels to resize them. Your layout is remembered in the browser.
+
+---
+
+## Loading a repository
+
+On the welcome screen, paste any of these formats:
+
+- `github.com/owner/repo`
+- `https://github.com/owner/repo`
+- `owner/repo`
+
+Click **Load**. The file tree fills in on the left and the repo name appears in the header.
+
+After the first load, you can also use the search bar at the top to load a different repo.
+
+---
+
+## Browsing files
+
+- **Single-click** a file → opens it in the Code panel
+- **Single-click** a folder → expands or collapses it
+- Web files (HTML, CSS, JS, TSX) also update the **Live preview** when you browse them
+- Images, video, and audio open in the preview panel when selected
+
+---
+
+## Replaying files (live build)
+
+**Double-click** any file to start a live replay. You'll see:
+
+- Characters typing out in the Code panel
+- The preview updating as you go (for web files)
+- **Pause** / play controls in the header
+- **Speed** slider — from slow motion to extremely fast
+- **Progress** slider — scrub forward or backward within the current file
+
+When replay finishes, click **Replay** in the header to watch the same session again.
 
 <details>
-<summary><strong>Replay modes</strong></summary>
+<summary><strong>Double-clicking HTML / web projects</strong></summary>
 
 <br />
 
-| Mode | Trigger | Behavior |
-|------|---------|----------|
-| **Single file** | Double-click a file | Types one file; preview updates if web-related |
-| **Parallel web** | Double-click `index.html` | Types HTML, CSS, and JS/TSX in sync |
-| **Replay All** | **Replay All** button | Walks every file sequentially |
-| **Race** | **Race** + file type | Competing files type at the same speed |
+When you double-click `index.html` (or a page with linked CSS/JS), GitReplay often replays **all related web files together** — HTML, styles, and scripts type out in parallel so the preview builds like a real site.
 
-</details>
-
-<details>
-<summary><strong>Preview modes</strong></summary>
-
-<br />
-
-| Mode | When | Description |
-|------|------|-------------|
-| **Live build** | During replay | Partial HTML/CSS/JS injected as you type |
-| **Authentic** | Browse / after replay | Full page with assets from jsDelivr |
-| **Bundled** | Vite/React/TS source | esbuild-wasm bundles entry + imports |
-| **Media** | Image / video / audio | Dedicated viewer in the preview iframe |
+For Vite/React repos, open `index.html` or `src/main.tsx` and let the replay finish; the preview bundles the project in your browser when complete.
 
 </details>
 
 ---
 
-## Session authentication
+## Replay All
 
-GitReplay uses **session-based authentication** — your GitHub personal access token lives only in the browser tab you are using.
+Click **Replay All** in the header to walk through **every file** in the repository, one after another.
 
-| | |
-|---|---|
-| **Storage** | `sessionStorage` (never sent to GitReplay servers — there are none) |
-| **Lifetime** | Current tab only — **cleared when you close the tab** |
-| **Survives refresh** | Yes, within the same tab |
-| **Scopes** | None required for public repositories |
-| **Purpose** | Authenticate directly with GitHub’s API from your browser (5,000 req/hr vs 60 unauthenticated) |
-
-<details>
-<summary><strong>How to connect</strong></summary>
-
-<br />
-
-1. Open [GitReplay](https://delexoo.github.io/GitReplay/)
-2. Click **Connect GitHub for this session** on the welcome screen, or the **Token** button in the header after loading a repo
-3. Create a token at [github.com/settings/tokens/new](https://github.com/settings/tokens/new) — **no scopes** needed for public repos
-4. Paste the token and save — it stays in this tab until you close it
-
-</details>
-
-<details>
-<summary><strong>Privacy & security</strong></summary>
-
-<br />
-
-- GitReplay is a **static web app** hosted on GitHub Pages
-- API calls go **directly from your browser to GitHub** — no backend, no database, no token logging
-- Your token is **not** written to `localStorage`, cookies, or any server
-- Closing the tab ends your session
-
-</details>
+- The **Progress** bar spans the full queue — scrub to jump between files
+- The current file is highlighted in black in the file tree
+- A **Building…** pill appears in the preview while generation is active
 
 ---
 
-## How to use
+## Race mode
 
-1. **Open** [delexoo.github.io/GitReplay](https://delexoo.github.io/GitReplay/)
-2. **Connect** your GitHub token (recommended) for higher API limits this session
-3. **Paste** a public repository URL and click **Load**
-4. **Single-click** a file to browse · **Double-click** to replay it live
-5. Use **Replay All**, **Race**, speed slider, and progress scrubber as needed
+1. Choose a file type: **HTML**, **JS**, or **CSS**
+2. Click **Race**
+3. Multiple files of that type type out at the same time — first to finish wins
 
----
-
-## How it works
-
-```mermaid
-flowchart LR
-  subgraph Browser
-    UI[GitReplay UI]
-    Session[sessionStorage token]
-    Preview[Preview iframe]
-    Bundler[esbuild-wasm]
-  end
-  GitHub[(GitHub API)]
-  UI --> Session
-  UI -->|REST + raw files| GitHub
-  UI --> Bundler
-  Bundler --> Preview
-  UI --> Preview
-```
-
-1. **File tree** — GitHub Git Trees API (recursive), called from your browser
-2. **File content** — `raw.githubusercontent.com` with Contents API fallback
-3. **Replay** — `requestAnimationFrame` typing loop with scrubber
-4. **Preview** — iframe document built from cached files; framework projects bundled client-side
+Useful for comparing parallel implementations or just for fun.
 
 ---
 
 ## Live preview
 
-| Stack | Support |
-|-------|---------|
-| HTML / CSS / JS | Full live + authentic preview |
-| Vite + React + TS/TSX | In-browser bundle (esbuild-wasm + esm.sh) |
-| Built `dist/` / `build/` | jsDelivr asset URLs |
-| Vue / Svelte / Next.js | Not yet supported |
+The right-hand panel shows what the repo would look like in a browser.
+
+| What you see | When |
+|--------------|------|
+| Page building line-by-line | During replay |
+| Full rendered site | After replay, or when browsing a complete HTML page |
+| Image / video / audio | When you select media files |
+| **Building…** spinner | While code is actively generating |
 
 <details>
-<summary><strong>Vite / React notes</strong></summary>
+<summary><strong>Fullscreen preview</strong></summary>
 
 <br />
 
-- Entry detection prefers `main.tsx`, `main.jsx`, and module scripts in `index.html`
-- Vite dev scripts (`/@vite/`, React Refresh) are stripped before preview
-- `@/` imports resolve to `src/`
-- If bundling fails, try opening `dist/index.html` when the repo ships a build
+Click the **fullscreen** icon in the preview header. Replay controls move to the bottom of the screen. Press **Esc** or click the icon again to exit.
 
 </details>
+
+<details>
+<summary><strong>Supported project types</strong></summary>
+
+<br />
+
+| Type | Preview |
+|------|---------|
+| Plain HTML / CSS / JS | ✅ Live + full preview |
+| Vite + React + TypeScript | ✅ Bundled preview after build completes |
+| Committed `dist/` or `build/` folder | ✅ Loads built output |
+| Vue / Svelte / Next.js | ❌ Not yet supported |
+
+</details>
+
+---
+
+## GitHub token (session)
+
+Connecting a token is **optional** but recommended — it raises GitHub's API limit from 60 to 5,000 requests per hour for your session.
+
+| | |
+|---|---|
+| **Where it's stored** | Only in your current browser tab |
+| **When it's cleared** | When you **close the tab** |
+| **Sent to a server?** | No — calls go directly from your browser to GitHub |
+
+**To connect:**
+
+1. Click **Connect GitHub for this session** on the welcome screen, or the **Token** button in the header
+2. Create a token at [github.com/settings/tokens/new](https://github.com/settings/tokens/new) — no scopes required
+3. Paste it and click **Save**
+
+If you hit a rate limit without a token, GitReplay will prompt you to add one.
+
+---
+
+## Tips
+
+- **Slow down** the speed slider to follow along while learning
+- **Scrub progress** to jump to a specific moment in a long file
+- For React/Vite repos, double-click **`index.html`** and wait for the replay to finish for the best preview
+- If preview is empty, try single-clicking **`dist/index.html`** when the repo includes a production build
 
 ---
 
 ## FAQ
 
 <details>
-<summary><strong>Do I need to install anything?</strong></summary>
+<summary><strong>Do I need to download or install anything?</strong></summary>
 
 <br />
 
-No. GitReplay is a public website. Open the link and use it in any modern browser.
+No. Open [delexoo.github.io/GitReplay](https://delexoo.github.io/GitReplay/) in Chrome, Firefox, Safari, or Edge and start using it.
 
 </details>
 
 <details>
-<summary><strong>Why connect a GitHub token?</strong></summary>
+<summary><strong>Can I use private repositories?</strong></summary>
 
 <br />
 
-Without a token, GitHub limits unauthenticated API use to **60 requests per hour** per IP. Connecting your token for the session raises that to **5,000/hour** for you. The token never leaves your browser tab.
+Not yet. GitReplay works with **public** repositories only.
 
 </details>
 
 <details>
-<summary><strong>Does my token persist after I close the tab?</strong></summary>
+<summary><strong>Why did loading fail or ask for a token?</strong></summary>
 
 <br />
 
-No. Session storage is wiped when the tab closes. Refreshing the same tab keeps your session.
+GitHub limits how many API requests unauthenticated users can make. Connect a personal access token for the current tab session to continue loading repos.
 
 </details>
 
 <details>
-<summary><strong>Why is my React preview blank?</strong></summary>
+<summary><strong>Why is my preview blank on a React project?</strong></summary>
 
 <br />
 
-GitReplay bundles source in the browser — it does not run `npm run dev`. Ensure the repo has an `index.html` pointing to an entry like `src/main.tsx`, or open `dist/index.html` if a build is committed.
+Let the replay finish completely — bundling runs after the entry file is fully typed. If it still fails, the repo may need a committed `dist/` folder, or the project may use a framework GitReplay doesn't support yet.
 
 </details>
-
-<details>
-<summary><strong>Private repositories?</strong></summary>
-
-<br />
-
-Not supported yet. GitReplay targets **public** repositories.
-
-</details>
-
----
-
-## Project structure
-
-```
-GitReplay/
-├── index.html          # App shell
-├── css/style.css       # Layout and UI
-├── js/
-│   ├── app.js          # UI, replay engine, file tree
-│   ├── github.js       # GitHub client + session token
-│   ├── preview.js      # iframe preview
-│   ├── bundler.js      # esbuild-wasm for framework preview
-│   └── resize.js       # Panel resizing
-└── .github/workflows/  # GitHub Pages deploy
-```
-
----
-
-## Contributing
-
-1. Fork [Delexoo/GitReplay](https://github.com/Delexoo/GitReplay)
-2. Create a feature branch
-3. Open a pull request
-
-Do not commit tokens or secrets.
 
 ---
 
 ## License
 
 MIT © [Delexoo](https://github.com/Delexoo)
-
----
-
-<p align="center">
-  <a href="https://delexoo.github.io/GitReplay/">delexoo.github.io/GitReplay</a>
-</p>
