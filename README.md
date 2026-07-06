@@ -4,11 +4,11 @@
 </p>
 
 <p align="center">
-  <a href="https://delexoo.github.io/GitReplay/"><img src="https://img.shields.io/badge/Open%20GitReplay-111?style=for-the-badge" alt="Open GitReplay" /></a>
+  <a href="https://delexoo.github.io/GitReplay/welcome.html"><img src="https://img.shields.io/badge/Open%20GitReplay-111?style=for-the-badge" alt="Open GitReplay" /></a>
 </p>
 
 <p align="center">
-  <a href="https://delexoo.github.io/GitReplay/"><strong>delexoo.github.io/GitReplay</strong></a>
+  <a href="https://delexoo.github.io/GitReplay/welcome.html"><strong>delexoo.github.io/GitReplay/welcome.html</strong></a>
 </p>
 
 ---
@@ -23,7 +23,7 @@ Open the app in your browser. Nothing to download or install.
 
 ## Quick start
 
-1. Go to **[delexoo.github.io/GitReplay](https://delexoo.github.io/GitReplay/)**
+1. Go to **[delexoo.github.io/GitReplay/welcome.html](https://delexoo.github.io/GitReplay/welcome.html)**
 2. *(Recommended)* Click **Connect GitHub for this session** and paste a [personal access token](https://github.com/settings/tokens/new) — no scopes needed for public repos
 3. Paste a repo URL (e.g. `github.com/vitejs/vite`) and click **Load**
 4. **Single-click** a file to read it · **Double-click** to replay it live
@@ -184,7 +184,7 @@ If you hit a rate limit without a token, GitReplay will prompt you to add one.
 
 <br />
 
-No. Open [delexoo.github.io/GitReplay](https://delexoo.github.io/GitReplay/) in Chrome, Firefox, Safari, or Edge and start using it.
+No. Open [welcome.html](https://delexoo.github.io/GitReplay/welcome.html) in Chrome, Firefox, Safari, or Edge and start using it.
 
 </details>
 

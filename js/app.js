@@ -10,6 +10,13 @@ import {
   setUserGitHubToken,
   validateUserGitHubToken,
 } from "./github.js";
+import {
+  getRepoUrl,
+  navigateToToken,
+  navigateToWelcome,
+  setPendingRepo,
+  setRepoUrl,
+} from "./session-nav.js";
 import { createPreviewController, isWebFile, isPreviewableMedia, getPreviewMediaKind, isScriptPath, isStylePath, pickBundleEntry, scoreHtmlPath } from "./preview.js";
 import { initPanelResize, initStackResize, equalizeStackSplit, equalizeWorkspacePanels } from "./resize.js";
 
@@ -47,8 +54,6 @@ const state = {
   collapsedFolders: new Set(),
   lastPreviewHtmlPath: null,
   lastSession: null,
-  pendingRepoUrl: null,
-  tokenPromptReason: null,
   progressScrubbing: false,
   scrubWasPlaying: false,
   scrubBookmark: null,
@@ -60,9 +65,7 @@ const els = {
   headerRepo: document.getElementById("header-repo"),
   navTools: document.getElementById("nav-tools"),
   repoInput: document.getElementById("repo-input"),
-  repoWelcomeInput: document.getElementById("repo-welcome-input"),
   startBtn: document.getElementById("start-btn"),
-  repoWelcomeBtn: document.getElementById("repo-welcome-btn"),
   replayAllBtn: document.getElementById("replay-all-btn"),
   raceControls: document.getElementById("race-controls"),
   raceKindSelect: document.getElementById("race-kind-select"),
@@ -75,7 +78,6 @@ const els = {
   progressSlider: document.getElementById("progress-slider"),
   progressLabel: document.getElementById("progress-label"),
   errorBanner: document.getElementById("error-banner"),
-  welcome: document.getElementById("welcome"),
   workspace: document.getElementById("workspace"),
   repoName: document.getElementById("repo-name"),
   fileTree: document.getElementById("file-tree"),
@@ -95,14 +97,6 @@ const els = {
   previewReplayDock: document.getElementById("preview-replay-dock"),
   previewEmpty: document.getElementById("preview-empty"),
   previewStatus: document.getElementById("preview-status"),
-  welcomeToken: document.getElementById("welcome-token"),
-  welcomeRepo: document.getElementById("welcome-repo"),
-  welcomeConnectBtn: document.getElementById("welcome-connect-btn"),
-  tokenInput: document.getElementById("token-input"),
-  tokenBtn: document.getElementById("token-btn"),
-  tokenSkipBtn: document.getElementById("token-skip-btn"),
-  welcomeTokenHeading: document.getElementById("welcome-token-heading"),
-  welcomeTokenSub: document.getElementById("welcome-token-sub"),
   tokenSettingsBtn: document.getElementById("token-settings-btn"),
 };
 
@@ -158,59 +152,11 @@ const preview = createPreviewController(
   els.previewStatus
 );
 
-function updateAuthChrome() {
-  const onTokenScreen =
-    !els.welcome.classList.contains("hidden") &&
-    !els.welcomeToken.classList.contains("hidden");
-  const inWorkspace = !els.workspace.classList.contains("hidden");
-  els.headerRepo.classList.toggle("hidden", onTokenScreen || !inWorkspace);
-}
-
-function showWelcomeToken({ rateLimited = false, voluntary = false } = {}) {
-  state.tokenPromptReason = rateLimited ? "rateLimit" : voluntary ? "voluntary" : null;
-  els.welcome.classList.remove("hidden");
-  els.workspace.classList.add("hidden");
-  els.welcomeToken.classList.remove("hidden");
-  els.welcomeRepo.classList.add("hidden");
-
-  if (rateLimited) {
-    els.welcomeTokenHeading.textContent = "Rate limit reached";
-    els.welcomeTokenSub.textContent = "Add a personal access token to keep loading repos.";
-    els.tokenBtn.textContent = "Continue";
-    els.tokenSkipBtn.classList.add("hidden");
-  } else {
-    els.welcomeTokenHeading.textContent = "GitHub token";
-    els.welcomeTokenSub.textContent = voluntary
-      ? "Optional. Stored in this tab only — cleared when you close it."
-      : "For higher API limits. Stored in this tab only — cleared when you close it.";
-    els.tokenBtn.textContent = "Save";
-    els.tokenSkipBtn.classList.remove("hidden");
-  }
-
-  updateAuthChrome();
-  els.tokenInput.focus();
-}
-
-function showWelcomeRepo() {
-  state.tokenPromptReason = null;
-  els.welcome.classList.remove("hidden");
-  els.workspace.classList.add("hidden");
-  els.welcomeToken.classList.add("hidden");
-  els.welcomeRepo.classList.remove("hidden");
-  updateAuthChrome();
-  requestAnimationFrame(() => els.repoWelcomeInput?.focus());
-}
-
-function activeRepoInput() {
-  const onRepoWelcome =
-    !els.welcome.classList.contains("hidden") &&
-    !els.welcomeRepo.classList.contains("hidden");
-  return onRepoWelcome ? els.repoWelcomeInput : els.repoInput;
-}
-
 function handleApiError(err, fallback = "Request failed") {
   if (isRateLimitError(err)) {
-    showWelcomeToken({ rateLimited: true });
+    const url = els.repoInput.value.trim();
+    if (url) setPendingRepo(url);
+    navigateToToken({ reason: "rateLimit", returnTo: "index.html" });
     showError(err.message ?? "GitHub rate limit reached. Add your token to continue.");
     return true;
   }
@@ -219,90 +165,27 @@ function handleApiError(err, fallback = "Request failed") {
 }
 
 function updateTokenUI() {
-  const inWorkspace = !els.workspace.classList.contains("hidden");
-  els.tokenSettingsBtn.classList.toggle("hidden", !inWorkspace);
   els.tokenSettingsBtn.classList.toggle("is-connected", hasUserGitHubToken());
   els.tokenSettingsBtn.title = hasUserGitHubToken()
     ? "GitHub token connected for this tab — click to change"
     : "Add GitHub token for this tab (optional)";
-  updateAuthChrome();
 }
 
-async function finishTokenConnect() {
-  updateTokenUI();
-  clearError();
-  state.tokenPromptReason = null;
-
-  if (state.pendingRepoUrl) {
-    const url = state.pendingRepoUrl;
-    state.pendingRepoUrl = null;
-    els.repoWelcomeInput.value = url;
-    els.repoInput.value = url;
-    await loadRepository();
-    return;
-  }
-
-  if (state.repoInfo) {
-    els.welcome.classList.add("hidden");
-    els.welcomeToken.classList.add("hidden");
-    els.workspace.classList.remove("hidden");
-    updateAuthChrome();
-    return;
-  }
-
-  showWelcomeRepo();
-}
-
-async function connectGitHubToken() {
-  const token = els.tokenInput.value.trim();
-  if (!token) {
-    if (state.tokenPromptReason === "voluntary") {
-      setUserGitHubToken("");
-      await finishTokenConnect();
-      return;
-    }
-    showError("Paste a GitHub token to continue");
-    return;
-  }
-
-  clearError();
-  els.tokenBtn.disabled = true;
-  const busyLabel = state.tokenPromptReason === "rateLimit" ? "Checking…" : "Saving…";
-  els.tokenBtn.textContent = busyLabel;
-
-  try {
-    const result = await validateUserGitHubToken(token);
-    if (result.valid) {
-      setUserGitHubToken(token);
-      await finishTokenConnect();
-      return;
-    }
-
-    if (result.networkError) {
-      setUserGitHubToken(token);
-      await finishTokenConnect();
-      showError(result.message ?? "Couldn't verify token — trying to load anyway.");
-      return;
-    }
-
-    showError(result.message ?? "Invalid GitHub token. Create one with no scopes for public repos.");
-  } catch {
-    showError("Could not verify token. Check your connection and try again.");
-  } finally {
-    els.tokenBtn.disabled = false;
-    els.tokenBtn.textContent = state.tokenPromptReason === "rateLimit" ? "Continue" : "Save";
-  }
-}
-
-async function initAuthGate() {
+async function bootWorkspace() {
   if (hasUserGitHubToken()) {
     const result = await validateUserGitHubToken(getUserGitHubToken());
-    if (!result.valid && !result.networkError) {
-      clearInvalidUserToken();
-    }
+    if (!result.valid && !result.networkError) clearInvalidUserToken();
   }
-  showWelcomeRepo();
   updateTokenUI();
+
+  const url = getRepoUrl();
+  if (!url) {
+    navigateToWelcome();
+    return;
+  }
+
+  els.repoInput.value = url;
+  await loadRepository();
 }
 
 function showError(msg) {
@@ -3190,12 +3073,10 @@ async function replayCurrent() {
 function setStartButton(loading, label = "Load") {
   els.startBtn.disabled = loading;
   els.startBtn.textContent = label;
-  els.repoWelcomeBtn.disabled = loading;
-  els.repoWelcomeBtn.textContent = loading ? "Loading…" : "Load repository";
 }
 
 async function loadRepository() {
-  const url = activeRepoInput().value.trim();
+  const url = els.repoInput.value.trim();
   if (!url) return;
 
   const parsed = parseGitHubUrl(url);
@@ -3235,26 +3116,19 @@ async function loadRepository() {
 
     els.repoName.textContent = `${info.owner}/${info.repo}`;
     els.repoInput.value = url;
-    els.repoWelcomeInput.value = url;
-    els.welcome.classList.add("hidden");
-    els.workspace.classList.remove("hidden");
+    setRepoUrl(url);
     equalizeWorkspacePanels(els.workspace);
     updateHeaderActions();
     updateFileTree();
     updateReplayUI();
     updateTokenUI();
-    updateAuthChrome();
     updateDisplay();
   } catch (err) {
     if (isRateLimitError(err)) {
-      state.pendingRepoUrl = url;
+      setPendingRepo(url);
     }
     if (!handleApiError(err, "Failed to load repository") && !state.repoInfo) {
-      els.welcome.classList.remove("hidden");
-      els.workspace.classList.add("hidden");
-      showWelcomeRepo();
-      updateHeaderActions();
-      updateAuthChrome();
+      navigateToWelcome();
     }
   } finally {
     setStartButton(false);
@@ -3303,30 +3177,17 @@ async function togglePreviewFullscreen() {
 }
 
 els.startBtn.addEventListener("click", loadRepository);
-els.repoWelcomeBtn.addEventListener("click", loadRepository);
 els.replayAllBtn.addEventListener("click", replayAllFiles);
 els.raceBtn.addEventListener("click", startRace);
 els.replayBtn.addEventListener("click", replayCurrent);
-els.tokenBtn.addEventListener("click", connectGitHubToken);
-els.tokenInput.addEventListener("keydown", (e) => e.key === "Enter" && connectGitHubToken());
 els.tokenSettingsBtn.addEventListener("click", () => {
-  els.tokenInput.value = getUserGitHubToken();
-  showWelcomeToken({ voluntary: true });
-});
-els.tokenSkipBtn.addEventListener("click", () => {
-  clearError();
-  showWelcomeRepo();
-});
-els.welcomeConnectBtn?.addEventListener("click", () => {
-  els.tokenInput.value = getUserGitHubToken();
-  showWelcomeToken({ voluntary: true });
+  navigateToToken({ reason: "voluntary", returnTo: "index.html" });
 });
 window.addEventListener("gitreplay:token-cleared", () => {
   updateTokenUI();
   showError("Your GitHub token was invalid and has been removed for this tab.");
 });
 els.repoInput.addEventListener("keydown", (e) => e.key === "Enter" && loadRepository());
-els.repoWelcomeInput.addEventListener("keydown", (e) => e.key === "Enter" && loadRepository());
 els.playPauseBtn.addEventListener("click", togglePlayPause);
 els.prevStepBtn.addEventListener("click", () => goToStep(state.currentStepIndex - 1));
 els.nextStepBtn.addEventListener("click", () => goToStep(state.currentStepIndex + 1));
@@ -3364,6 +3225,6 @@ updateProgressSlider();
 updateDisplay();
 updateReplayUI();
 updateHeaderActions();
-initAuthGate();
+bootWorkspace();
 initPanelResize(document.getElementById("workspace"));
 bindCodeScrollTracking();

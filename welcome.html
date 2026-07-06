@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Load repository — GitReplay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body class="prompt-page">
+    <header class="navbar navbar-prompt">
+      <div class="navbar-inner">
+        <a class="navbar-brand" href="welcome.html">
+          <span class="logo">GitReplay</span>
+        </a>
+      </div>
+    </header>
+
+    <div id="error-banner" class="error-banner hidden"></div>
+
+    <main class="welcome">
+      <div class="welcome-screen">
+        <h1 class="welcome-heading">Load a repository</h1>
+        <p class="welcome-lead">Paste a GitHub URL, then double-click any file to watch it build live.</p>
+        <div class="welcome-bar">
+          <input
+            id="repo-welcome-input"
+            type="text"
+            placeholder="github.com/user/repo"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Repository URL"
+          />
+          <button id="repo-welcome-btn" type="button" class="btn btn-primary">Load</button>
+        </div>
+        <p class="welcome-note">
+          Public repositories only ·
+          <a href="token.html?reason=voluntary&amp;return=welcome.html">Connect GitHub for this session</a>
+        </p>
+      </div>
+    </main>
+
+    <script type="module" src="js/welcome-page.js"></script>
+  </body>
+</html>
