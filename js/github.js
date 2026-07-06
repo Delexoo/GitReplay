@@ -99,17 +99,6 @@ export function hasUserGitHubToken() {
   return Boolean(getUserGitHubToken());
 }
 
-export async function checkServerHasToken() {
-  try {
-    const response = await fetch("/api/health");
-    if (!response.ok) return false;
-    const data = await response.json();
-    return Boolean(data.authenticated);
-  } catch {
-    return false;
-  }
-}
-
 async function validateUserGitHubTokenDirect(token) {
   try {
     const response = await fetch("https://api.github.com/user", {
@@ -138,23 +127,6 @@ async function validateUserGitHubTokenDirect(token) {
 }
 
 export async function validateUserGitHubToken(token) {
-  try {
-    const response = await fetch("/api/validate-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
-    const data = await response.json().catch(() => null);
-    if (response.ok && data?.valid === true) return { valid: true };
-    if (response.ok && data?.valid === false) {
-      return {
-        valid: false,
-        message: data.message ?? "Invalid GitHub token.",
-      };
-    }
-  } catch {
-    /* fall through to direct GitHub check */
-  }
   return validateUserGitHubTokenDirect(token);
 }
 
@@ -196,25 +168,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function githubFetch(apiUrl) {
   if (memoryCache.has(apiUrl)) return memoryCache.get(apiUrl);
 
-  const apiPath = apiUrl.replace("https://api.github.com", "");
-  const proxyUrl = `/api/github${apiPath}`;
+  let response = await fetch(apiUrl, { headers: requestHeaders() });
 
-  let response;
-  const userToken = getUserGitHubToken();
-  if (userToken) {
-    response = await fetch(apiUrl, { headers: requestHeaders() });
-    if (response.status === 401) {
-      clearInvalidUserToken();
-      response = await fetch(proxyUrl, { headers: HEADERS });
-      if (response.status === 404) {
-        response = await fetch(apiUrl, { headers: HEADERS });
-      }
-    }
-  } else {
-    response = await fetch(proxyUrl, { headers: HEADERS });
-    if (response.status === 404) {
-      response = await fetch(apiUrl, { headers: HEADERS });
-    }
+  if (response.status === 401 && hasUserGitHubToken()) {
+    clearInvalidUserToken();
+    response = await fetch(apiUrl, { headers: HEADERS });
   }
 
   if (!response.ok) {

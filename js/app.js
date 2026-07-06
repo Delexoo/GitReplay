@@ -3,7 +3,6 @@ import {
   fetchRepoInfo,
   fetchRepoTree,
   fetchFileContent,
-  checkServerHasToken,
   clearInvalidUserToken,
   getUserGitHubToken,
   hasUserGitHubToken,
@@ -48,7 +47,6 @@ const state = {
   collapsedFolders: new Set(),
   lastPreviewHtmlPath: null,
   lastSession: null,
-  serverHasToken: false,
   pendingRepoUrl: null,
   tokenPromptReason: null,
   progressScrubbing: false,
@@ -99,6 +97,7 @@ const els = {
   previewStatus: document.getElementById("preview-status"),
   welcomeToken: document.getElementById("welcome-token"),
   welcomeRepo: document.getElementById("welcome-repo"),
+  welcomeConnectBtn: document.getElementById("welcome-connect-btn"),
   tokenInput: document.getElementById("token-input"),
   tokenBtn: document.getElementById("token-btn"),
   tokenSkipBtn: document.getElementById("token-skip-btn"),
@@ -220,7 +219,8 @@ function handleApiError(err, fallback = "Request failed") {
 }
 
 function updateTokenUI() {
-  els.tokenSettingsBtn.classList.toggle("hidden", state.serverHasToken);
+  const inWorkspace = !els.workspace.classList.contains("hidden");
+  els.tokenSettingsBtn.classList.toggle("hidden", !inWorkspace);
   els.tokenSettingsBtn.classList.toggle("is-connected", hasUserGitHubToken());
   els.tokenSettingsBtn.title = hasUserGitHubToken()
     ? "GitHub token connected for this tab — click to change"
@@ -295,8 +295,7 @@ async function connectGitHubToken() {
 }
 
 async function initAuthGate() {
-  state.serverHasToken = await checkServerHasToken();
-  if (hasUserGitHubToken() && !state.serverHasToken) {
+  if (hasUserGitHubToken()) {
     const result = await validateUserGitHubToken(getUserGitHubToken());
     if (!result.valid && !result.networkError) {
       clearInvalidUserToken();
@@ -3317,6 +3316,10 @@ els.tokenSettingsBtn.addEventListener("click", () => {
 els.tokenSkipBtn.addEventListener("click", () => {
   clearError();
   showWelcomeRepo();
+});
+els.welcomeConnectBtn?.addEventListener("click", () => {
+  els.tokenInput.value = getUserGitHubToken();
+  showWelcomeToken({ voluntary: true });
 });
 window.addEventListener("gitreplay:token-cleared", () => {
   updateTokenUI();
