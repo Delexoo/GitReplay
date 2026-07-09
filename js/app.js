@@ -18,6 +18,7 @@ import {
   setRepoUrl,
 } from "./session-nav.js";
 import { createPreviewController, isWebFile, isPreviewableMedia, getPreviewMediaKind, isScriptPath, isStylePath, pickBundleEntry, scoreHtmlPath } from "./preview.js";
+import { isMarkdownPath } from "./markdown.js";
 import { initPanelResize, initStackResize, equalizeStackSplit, equalizeWorkspacePanels } from "./resize.js";
 
 const state = {
@@ -264,6 +265,12 @@ function getPreviewAssetUrl(path) {
   if (!state.parsed || !state.repoInfo || !path) return null;
   const encoded = path.split("/").map(encodeURIComponent).join("/");
   return `https://cdn.jsdelivr.net/gh/${state.parsed.owner}/${state.parsed.repo}@${state.repoInfo.defaultBranch}/${encoded}`;
+}
+
+function getRepoBlobUrl(path) {
+  if (!state.parsed || !state.repoInfo || !path) return null;
+  const encoded = path.split("/").map(encodeURIComponent).join("/");
+  return `https://github.com/${state.parsed.owner}/${state.parsed.repo}/blob/${state.repoInfo.defaultBranch}/${encoded}`;
 }
 
 function previewRefreshOptions(extra = {}) {
@@ -1015,6 +1022,11 @@ function refreshPreviewThrottled(path, options = {}) {
     state.replaySpeed >= 1000 ? 8 : state.replaySpeed >= 300 ? 16 : state.replaySpeed >= 100 ? 40 : state.replaySpeed >= 20 ? 80 : state.replaySpeed >= 5 ? 40 : 16;
   if (now - state.lastPreviewRefresh < minGap) return;
   state.lastPreviewRefresh = now;
+  if (options.markdown !== undefined || isMarkdownPath(path)) {
+    const md = options.markdown ?? state.loadedFiles.get(path) ?? "";
+    void preview.refreshMarkdown(path, md, options);
+    return;
+  }
   void preview.refreshAsync(path, options);
 }
 
@@ -2229,6 +2241,24 @@ function pushPreviewFiles(path, content = "") {
 }
 
 function refreshPreviewForPath(path, content = "", force = false) {
+  if (path && isMarkdownPath(path)) {
+    const md = content || state.loadedFiles.get(path) || "";
+    const live = isLiveReplayPosition();
+    const opts = previewRefreshOptions({
+      liveBuild: live,
+      forceMount: force && !live,
+      resolveAssetUrl: getPreviewAssetUrl,
+      repoLinkUrl: getRepoBlobUrl,
+    });
+    if (force || live) {
+      state.lastPreviewRefresh = performance.now();
+      void preview.refreshMarkdown(path, md, opts);
+    } else {
+      refreshPreviewThrottled(path, { ...opts, markdown: md });
+    }
+    return;
+  }
+
   if (path && isPreviewableMedia(path) && !state.isPlaying) {
     const mediaUrl = getRawFileUrl(path);
     if (!mediaUrl) return;

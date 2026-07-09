@@ -1,4 +1,5 @@
 import { bundlePreviewEntry, getBundleError, normalizeBundledPreview } from "./bundler.js";
+import { buildMarkdownDocument, markdownPreviewLabel } from "./markdown.js";
 
 const WEB = {
   html: /\.(html?|htm)$/i,
@@ -1462,10 +1463,45 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
     frameEl.classList.remove("hidden-frame");
   }
 
+  async function refreshMarkdown(activePath, markdown, options = {}) {
+    const {
+      liveBuild = false,
+      keepLast = true,
+      forceMount = false,
+      resolveAssetUrl = null,
+      repoLinkUrl = null,
+    } = options;
+
+    liveBuildActive = false;
+
+    try {
+      const doc = await buildMarkdownDocument(markdown ?? "", {
+        filePath: activePath,
+        resolveAssetUrl,
+        repoLinkUrl,
+        partial: liveBuild,
+      });
+      mountDocument(doc, forceMount, false);
+      statusEl.textContent = markdownPreviewLabel(activePath);
+      return doc;
+    } catch (err) {
+      console.warn("GitReplay markdown preview failed:", err);
+      if (keepLast && hasDocument) {
+        showFrame();
+        return null;
+      }
+      frameEl.classList.add("hidden-frame");
+      emptyEl.classList.remove("hidden");
+      statusEl.textContent = "—";
+      return null;
+    }
+  }
+
   return {
     setFile,
     refresh,
     refreshAsync,
+    refreshMarkdown,
     resolvePreviewBundle,
     clear,
     invalidate,
