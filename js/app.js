@@ -658,9 +658,16 @@ function scrollGeneratingCodeIntoView() {
     body.scrollTop = body.scrollHeight;
   });
 
-  const split = els.codeViewer.querySelector(".code-split.code-split-scroll");
-  if (split?.querySelector(".code-pane-generating")) {
-    split.scrollTop = split.scrollHeight;
+  const split = els.codeViewer.querySelector('.code-split.code-split-scroll[data-split-id="code"]');
+  if (split) {
+    const generating = split.querySelector(".code-pane-generating");
+    const pane = generating?.closest(".split-pane");
+    if (pane) {
+      const target = pane.offsetTop + pane.offsetHeight - split.clientHeight;
+      split.scrollTop = Math.max(0, target);
+    } else if (split.querySelector(".code-pane-generating")) {
+      split.scrollTop = split.scrollHeight;
+    }
   }
 
   els.codeViewer.querySelectorAll(".code-pane-generating").forEach((pane) => {
@@ -1338,10 +1345,7 @@ function getCodePanes(path, content) {
 }
 
 function paneKeyForPath(path) {
-  if (WEB.html.test(path)) return "html";
-  if (WEB.css.test(path)) return "css";
-  if (WEB.js.test(path)) return "js";
-  return path.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return path.replace(/[^a-zA-Z0-9_-]/g, "_") || "code";
 }
 
 function visibleCodePanes(panes, typing) {

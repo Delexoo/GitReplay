@@ -1121,15 +1121,11 @@ body.is-resizing {
 .code-pane-generating .code-pane-body,
 .code-scroll.code-generating,
 .race-lane-generating .race-lane-body {
-  overflow: hidden;
-  pointer-events: none;
-  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .code-viewer.is-typing .code-split.code-split-scroll:has(.code-pane-generating) {
-  overflow: hidden;
-  pointer-events: none;
-  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .code-pane-body .code-block {

@@ -9,9 +9,13 @@ export function isPreviewPrimary(path) {
   return false;
 }
 
-/** True when the code panel should not show raw file contents. */
+/** True when the code panel should not show raw file contents (binary media only). */
 export function isCodePanelExempt(path) {
-  return isPreviewPrimary(path);
+  if (!path) return false;
+  if (isMarkdownPath(path)) return false;
+  if (/\.svg$/i.test(path)) return false;
+  const kind = getPreviewMediaKind(path);
+  return kind === "image" || kind === "video" || kind === "audio";
 }
 
 export function usesLivePreview(path) {
