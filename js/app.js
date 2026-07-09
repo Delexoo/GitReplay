@@ -23,6 +23,7 @@ import {
   codePanelPlaceholderLabel,
   isCodePanelExempt,
   isPreviewPrimary,
+  usesLivePreview,
 } from "./content-kind.js";
 import { initPanelResize, initStackResize, equalizeStackSplit, equalizeWorkspacePanels } from "./resize.js";
 
@@ -2285,6 +2286,7 @@ function refreshPreviewForPath(path, content = "", force = false) {
       preview.invalidate();
       void preview.refresh(path, {
         keepLast: true,
+        liveBuild: live,
         forceMount: force || live,
         resolveAssetUrl: getPreviewAssetUrl,
       });
@@ -2873,6 +2875,12 @@ function startFileReplay(steps) {
   }
 
   ensureFolderExpanded(state.replayPath);
+  if (state.replayPath && usesLivePreview(state.replayPath)) {
+    preview.beginLiveBuild();
+    if (isWebFile(state.replayPath) || WEB.svg.test(state.replayPath)) {
+      preview.setFile(state.replayPath, "");
+    }
+  }
   updateReplayUI();
   renderTimeline();
   onStepChange("", state.replayPath);

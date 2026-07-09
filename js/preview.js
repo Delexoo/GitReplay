@@ -1032,24 +1032,92 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
     return false;
   }
 
+  function getElementDocumentBottom(el) {
+    if (!el?.isConnected) return -1;
+    const win = el.ownerDocument?.defaultView;
+    if (!win) return -1;
+    const rect = el.getBoundingClientRect();
+    return rect.bottom + win.scrollY;
+  }
+
   function findLastBuildTarget(body) {
     if (!body) return null;
 
+    const roots = [];
+    const markdown = body.querySelector(".markdown-body");
+    if (markdown) roots.push(markdown);
+    roots.push(body);
+
     let best = null;
-    let bestBottom = -Infinity;
+    let bestScore = -Infinity;
+
+    const isMeaningful = (el) => {
+      if (isIgnoredScrollTarget(el)) return false;
+      if (el.hasAttribute?.("data-gitreplay-build-edge")) return false;
+      const tag = el.tagName;
+      if (
+        [
+          "IMG",
+          "VIDEO",
+          "AUDIO",
+          "SVG",
+          "CANVAS",
+          "IFRAME",
+          "HR",
+          "TABLE",
+          "PRE",
+          "BLOCKQUOTE",
+          "DETAILS",
+          "ARTICLE",
+          "SECTION",
+        ].includes(tag)
+      ) {
+        return true;
+      }
+      if (el.getAttribute?.("data-gitreplay-template-preview") != null) return true;
+      if (/^H[1-6]$/.test(tag)) return true;
+      if (el.textContent?.trim()) return true;
+      return el.children.length > 0;
+    };
 
     const visit = (el) => {
-      if (isIgnoredScrollTarget(el)) return;
-      const rect = el.getBoundingClientRect?.();
-      if (rect && (rect.height > 0 || rect.width > 0) && rect.bottom >= bestBottom) {
-        bestBottom = rect.bottom;
-        best = el;
+      if (isMeaningful(el)) {
+        const score = getElementDocumentBottom(el);
+        if (score >= bestScore) {
+          bestScore = score;
+          best = el;
+        }
       }
       for (const child of el.children) visit(child);
     };
 
-    for (const child of body.children) visit(child);
-    return best;
+    for (const root of roots) {
+      for (const child of root.children) visit(child);
+    }
+
+    if (!best) {
+      for (const root of roots) {
+        const last = root.lastElementChild;
+        if (last && !isIgnoredScrollTarget(last) && !last.hasAttribute?.("data-gitreplay-build-edge")) {
+          return last;
+        }
+      }
+    }
+
+    return best ?? body.lastElementChild ?? body;
+  }
+
+  function ensureBuildEdgeMarker(doc) {
+    if (!doc?.body) return null;
+    let marker = doc.querySelector("[data-gitreplay-build-edge]");
+    if (!marker) {
+      marker = doc.createElement("span");
+      marker.setAttribute("data-gitreplay-build-edge", "");
+      marker.setAttribute("aria-hidden", "true");
+      marker.style.cssText = "display:block;width:0;height:0;overflow:hidden;pointer-events:none;";
+    }
+    doc.body.appendChild(marker);
+    return marker;
   }
 
   function scrollOverflowParents(el) {
@@ -1098,7 +1166,8 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
     if (!win || !iframeDoc) return;
 
     const tick = () => {
-      const target = findLastBuildTarget(iframeDoc.body);
+      const marker = ensureBuildEdgeMarker(iframeDoc);
+      const target = marker?.isConnected ? marker : findLastBuildTarget(iframeDoc.body);
       applyPreviewScroll(win, iframeDoc, target);
     };
 
@@ -1107,7 +1176,8 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
       requestAnimationFrame(tick);
     });
     setTimeout(tick, 0);
-    setTimeout(tick, 60);
+    setTimeout(tick, 48);
+    setTimeout(tick, 120);
   }
 
   function writeFullDocument(doc) {
@@ -1123,6 +1193,7 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
         docEl.write(doc);
         docEl.close();
         if (liveBuildActive) {
+          ensureBuildEdgeMarker(docEl);
           scrollPreviewToBuildEdge(frameEl.contentWindow, docEl);
         }
         return true;
@@ -1181,6 +1252,7 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
     iframeDoc.body.innerHTML = html;
     for (const node of helpers) iframeDoc.body.appendChild(node);
     runLiveBuildHelpersInDoc(iframeDoc);
+    if (liveBuildActive) ensureBuildEdgeMarker(iframeDoc);
   }
 
   function patchLiveDocument(docHtml) {
@@ -1472,7 +1544,7 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
       repoLinkUrl = null,
     } = options;
 
-    liveBuildActive = false;
+    liveBuildActive = liveBuild;
 
     try {
       const doc = await buildMarkdownDocument(markdown ?? "", {
@@ -1481,7 +1553,7 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
         repoLinkUrl,
         partial: liveBuild,
       });
-      mountDocument(doc, forceMount, false);
+      mountDocument(doc, forceMount, liveBuild);
       statusEl.textContent = markdownPreviewLabel(activePath);
       return doc;
     } catch (err) {
