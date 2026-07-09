@@ -1186,6 +1186,11 @@ body.is-resizing {
   text-align: center;
 }
 
+.code-viewer .code-preview-only {
+  max-width: 280px;
+  line-height: 1.5;
+}
+
 .code-block {
   display: flex;
   width: 100%;

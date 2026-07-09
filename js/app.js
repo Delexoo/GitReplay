@@ -19,6 +19,11 @@ import {
 } from "./session-nav.js";
 import { createPreviewController, isWebFile, isPreviewableMedia, getPreviewMediaKind, isScriptPath, isStylePath, pickBundleEntry, scoreHtmlPath } from "./preview.js";
 import { isMarkdownPath } from "./markdown.js";
+import {
+  codePanelPlaceholderLabel,
+  isCodePanelExempt,
+  isPreviewPrimary,
+} from "./content-kind.js";
 import { initPanelResize, initStackResize, equalizeStackSplit, equalizeWorkspacePanels } from "./resize.js";
 
 const state = {
@@ -1997,6 +2002,13 @@ function renderTimeline() {
   });
 }
 
+function showCodePanelPlaceholder(path) {
+  els.codePath.textContent = path?.split("/").pop() ?? "—";
+  state.codeLayout = null;
+  state.codeLayoutKey = null;
+  els.codeViewer.innerHTML = `<p class="empty code-preview-only">${escapeHtml(codePanelPlaceholderLabel(path))}</p>`;
+}
+
 function renderCode(path, content, typing = false) {
   if (state.raceMode) {
     renderRaceCode(typing);
@@ -2005,6 +2017,11 @@ function renderCode(path, content, typing = false) {
 
   if (state.parallelWeb) {
     renderParallelWebCode(typing);
+    return;
+  }
+
+  if (path && isCodePanelExempt(path)) {
+    showCodePanelPlaceholder(path);
     return;
   }
 
@@ -2019,7 +2036,7 @@ function renderCode(path, content, typing = false) {
 
   const singleContent =
     visiblePanes[0]?.content ??
-    (isPreviewableMedia(path) && !WEB.svg.test(path) ? mediaCodePlaceholder(path) : content) ??
+    (isPreviewableMedia(path) && !WEB.svg.test(path) ? "" : content) ??
     "";
   const singlePath = visiblePanes[0]?.filePath ?? path;
 
@@ -2259,11 +2276,26 @@ function refreshPreviewForPath(path, content = "", force = false) {
     return;
   }
 
-  if (path && isPreviewableMedia(path) && !state.isPlaying) {
+  if (path && isPreviewableMedia(path)) {
+    const live = isLiveReplayPosition();
+    const slice = content || state.loadedFiles.get(path) || "";
+
+    if (WEB.svg.test(path)) {
+      preview.setFile(path, slice);
+      preview.invalidate();
+      void preview.refresh(path, {
+        keepLast: true,
+        forceMount: force || live,
+        resolveAssetUrl: getPreviewAssetUrl,
+      });
+      return;
+    }
+
     const mediaUrl = getRawFileUrl(path);
-    if (!mediaUrl) return;
-    preview.invalidate();
-    preview.refresh(path, { mediaUrl, keepLast: true, forceMount: true });
+    if (mediaUrl) {
+      preview.invalidate();
+      preview.refresh(path, { mediaUrl, keepLast: true, forceMount: true });
+    }
     return;
   }
 
@@ -2499,12 +2531,6 @@ async function ensureFileContent(path) {
   );
   state.loadedFiles.set(path, content);
   return content;
-}
-
-function mediaCodePlaceholder(path) {
-  const kind = getPreviewMediaKind(path);
-  if (!kind) return "";
-  return `${kind[0].toUpperCase()}${kind.slice(1)} file — open live preview to view.`;
 }
 
 function getRawFileUrl(path) {
@@ -2886,6 +2912,11 @@ async function replayFile(path) {
       }
     }
 
+    if (isPreviewableMedia(path) && !WEB.svg.test(path)) {
+      await selectFile(path);
+      return;
+    }
+
     startFileReplay([makeFileStep(0, path, content)]);
   } catch (err) {
     handleApiError(err, "Failed to replay file");
@@ -2894,7 +2925,7 @@ async function replayFile(path) {
 
 function shouldSkipInReplayAll(path) {
   const kind = getPreviewMediaKind(path);
-  return kind === "image" || kind === "video";
+  return kind === "image" || kind === "video" || kind === "audio";
 }
 
 async function replayAllFiles() {
@@ -2949,13 +2980,9 @@ async function selectFile(path) {
   updateReplayUI();
 
   try {
-    let content;
-    if (isPreviewableMedia(path) && !WEB.svg.test(path)) {
-      content = mediaCodePlaceholder(path);
-    } else {
-      content = await ensureFileContent(path);
-    }
+    const content = await ensureFileContent(path);
     state.fileContent = content;
+
     if (isWebFile(path)) {
       await setupWebPreviewContext(path);
       const htmlPath = WEB.html.test(path) ? path : getAssetParentHtml(path);
@@ -2967,10 +2994,10 @@ async function selectFile(path) {
       state.codeLayoutKey = null;
       preview.invalidate();
       refreshPreviewForPath(path, content, true);
-    } else if (isPreviewableMedia(path)) {
+    } else if (isPreviewPrimary(path)) {
       state.webPreviewPaths = null;
       preview.invalidate();
-      refreshPreviewForPath(path, "", true);
+      refreshPreviewForPath(path, content, true);
     } else {
       state.webPreviewPaths = null;
       preview.clear();
