@@ -1,6 +1,7 @@
 /**
- * Plays a finished page like a short assembly video.
- * Layout stays put. Components fade in from top to bottom.
+ * Assembles a finished page one small piece at a time.
+ * Containers are placed, then text is typed and media is fixed inside them.
+ * Layout stays put: pieces only change opacity, so the page does not jump.
  */
 
 const DIRECTOR_CSS = `
@@ -8,14 +9,40 @@ html.gitreplay-assembling,
 html.gitreplay-assembling body {
   scroll-behavior: auto !important;
 }
-html.gitreplay-assembling .gitreplay-piece {
+html.gitreplay-assembling .gitreplay-box {
   opacity: 0 !important;
 }
-html.gitreplay-assembling .gitreplay-piece.gitreplay-in {
+html.gitreplay-assembling .gitreplay-box.gitreplay-in {
   opacity: 1 !important;
-  transition: opacity 0.6s ease !important;
+  transition: opacity 0.45s ease !important;
 }
-html.gitreplay-assembling.gitreplay-instant .gitreplay-piece {
+html.gitreplay-assembling span.gitreplay-ch {
+  display: inline !important;
+  position: static !important;
+  float: none !important;
+  clear: none !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  letter-spacing: inherit !important;
+  font: inherit !important;
+  color: inherit !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+  opacity: 0;
+}
+html.gitreplay-assembling span.gitreplay-ch.gitreplay-in {
+  opacity: 1;
+  transition: opacity 0.04s linear;
+}
+html.gitreplay-assembling.gitreplay-instant .gitreplay-box,
+html.gitreplay-assembling.gitreplay-instant span.gitreplay-ch {
   transition: none !important;
 }
 `;
@@ -26,11 +53,57 @@ const ATOMIC_TAGS = new Set([
   "SVG",
   "CANVAS",
   "PICTURE",
-  "BUTTON",
+  "IFRAME",
   "INPUT",
   "TEXTAREA",
   "SELECT",
-  "IFRAME",
+]);
+
+const FRAME_TAGS = new Set([
+  "P",
+  "LI",
+  "BLOCKQUOTE",
+  "FIGCAPTION",
+  "PRE",
+  "TD",
+  "TH",
+  "DT",
+  "DD",
+  "LABEL",
+  "LEGEND",
+  "CAPTION",
+  "BUTTON",
+  "A",
+  "SUMMARY",
+  "HEADER",
+  "FOOTER",
+  "NAV",
+  "MAIN",
+  "SECTION",
+  "ARTICLE",
+  "ASIDE",
+  "FORM",
+  "UL",
+  "OL",
+  "TABLE",
+  "FIGURE",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+]);
+
+const TEXT_INPUT_TYPES = new Set([
+  "",
+  "text",
+  "search",
+  "email",
+  "url",
+  "tel",
+  "password",
+  "number",
 ]);
 
 function isSkippable(el) {
@@ -53,7 +126,7 @@ function isShown(el) {
   const view = el.ownerDocument?.defaultView;
   if (!view) return false;
   const cs = view.getComputedStyle(el);
-  if (cs.display === "none" || cs.visibility === "hidden") return false;
+  if (cs.display === "none" || cs.visibility === "hidden" || cs.visibility === "collapse") return false;
   if (Number(cs.opacity) === 0) return false;
   const rect = el.getBoundingClientRect();
   return rect.width >= 2 && rect.height >= 2;
@@ -69,55 +142,109 @@ function imageLabel(src) {
   }
 }
 
-function pieceCaption(elements) {
-  const el = elements[0];
+function boxCaption(el) {
   const tag = el.tagName;
-  if (elements.length > 1 && elements.every((node) => node.parentElement === el.parentElement)) {
-    if (elements.some((node) => node.tagName === "IMG" || node.tagName === "VIDEO")) {
-      return { label: "Placing images", detail: `${elements.length} images` };
-    }
-    if (elements.every((node) => node.tagName === "BUTTON" || node.tagName === "A" || node.tagName === "LI")) {
-      return { label: "Placing controls", detail: `${elements.length} items` };
-    }
-  }
   if (tag === "IMG" || tag === "VIDEO" || tag === "PICTURE" || tag === "SVG" || tag === "CANVAS") {
     return { label: "Placing image", detail: imageLabel(el.getAttribute("src") || el.currentSrc || "") };
   }
+  if (tag === "IFRAME") return { label: "Placing embed", detail: "" };
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+    return { label: "Placing field", detail: el.getAttribute("placeholder") || el.getAttribute("name") || "" };
+  }
   if (tag === "BUTTON" || el.getAttribute("role") === "button") {
-    return { label: "Placing button", detail: (el.textContent || "").trim().slice(0, 42) };
+    return { label: "Placing button", detail: "" };
   }
-  if (/^H[1-6]$/.test(tag)) {
-    return { label: "Adding heading", detail: (el.textContent || "").trim().slice(0, 42) };
+  if (tag === "A") return { label: "Placing link", detail: "" };
+  if (/^H[1-6]$/.test(tag)) return { label: "Placing heading", detail: "" };
+  if (tag === "P" || tag === "BLOCKQUOTE" || tag === "FIGCAPTION" || tag === "PRE") {
+    return { label: "Placing text", detail: "" };
   }
-  if (tag === "P" || tag === "LI" || tag === "BLOCKQUOTE" || tag === "FIGCAPTION") {
-    return { label: "Adding text", detail: (el.textContent || "").trim().slice(0, 42) };
-  }
+  if (tag === "LI" || tag === "DT" || tag === "DD") return { label: "Placing item", detail: "" };
   if (tag === "NAV" || tag === "HEADER") return { label: "Placing header", detail: "" };
   if (tag === "FOOTER") return { label: "Placing footer", detail: "" };
   if (tag === "FORM") return { label: "Placing form", detail: "" };
-  return { label: "Adding component", detail: (el.textContent || "").trim().slice(0, 42) };
+  if (tag === "UL" || tag === "OL") return { label: "Placing list", detail: "" };
+  const aria = el.getAttribute("aria-label");
+  if (aria) return { label: "Placing container", detail: aria.trim().slice(0, 42) };
+  return { label: "Placing container", detail: "" };
 }
 
-function collectPieces(body) {
-  const pieces = [];
-
-  function walk(el) {
-    if (!el || el.nodeType !== 1 || isSkippable(el) || !isShown(el)) return;
-    const kids = [...el.children].filter((child) => !isSkippable(child) && isShown(child));
-    const tag = el.tagName;
-
-    if (ATOMIC_TAGS.has(tag) || kids.length === 0) {
-      const rect = el.getBoundingClientRect();
-      const text = (el.textContent || "").trim();
-      if (rect.width >= 2 && rect.height >= 2 && (text || ATOMIC_TAGS.has(tag))) pieces.push(el);
-      return;
-    }
-
-    for (const kid of kids) walk(kid);
+function hasOwnChrome(cs) {
+  const bg = cs.backgroundColor || "";
+  const painted = bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)";
+  const image = cs.backgroundImage && cs.backgroundImage !== "none";
+  const shadow = cs.boxShadow && cs.boxShadow !== "none";
+  const outline = (parseFloat(cs.outlineWidth) || 0) > 0 && cs.outlineStyle !== "none";
+  const radius = (parseFloat(cs.borderTopLeftRadius) || 0) > 0;
+  let border = false;
+  let padded = false;
+  for (const side of ["Top", "Right", "Bottom", "Left"]) {
+    if ((parseFloat(cs[`border${side}Width`]) || 0) > 0 && cs[`border${side}Style`] !== "none") border = true;
+    if ((parseFloat(cs[`padding${side}`]) || 0) >= 12) padded = true;
   }
+  const gap = Math.max(parseFloat(cs.rowGap) || 0, parseFloat(cs.columnGap) || 0, parseFloat(cs.gap) || 0);
+  return painted || image || shadow || outline || radius || border || padded || gap >= 8;
+}
 
-  for (const child of body.children) walk(child);
-  return pieces;
+function shouldPlace(el, cs) {
+  if (ATOMIC_TAGS.has(el.tagName) || FRAME_TAGS.has(el.tagName)) return true;
+  if (el.getAttribute("role") === "button") return true;
+  return hasOwnChrome(cs);
+}
+
+function isInlineDisplay(display) {
+  return (
+    display === "inline" ||
+    display === "inline-block" ||
+    display === "inline-flex" ||
+    display === "inline-grid" ||
+    display === "contents"
+  );
+}
+
+function displayedText(node) {
+  const raw = node.nodeValue ?? "";
+  if (!raw || (!/[^\s]/.test(raw) && !raw.includes("\u00A0"))) return "";
+  const parent = node.parentElement;
+  const view = node.ownerDocument?.defaultView;
+  const whiteSpace = parent && view ? view.getComputedStyle(parent).whiteSpace : "normal";
+  if (whiteSpace === "pre" || whiteSpace === "pre-wrap" || whiteSpace === "break-spaces") return raw;
+  if (whiteSpace === "pre-line") return raw.replace(/[ \t\f\v]+/g, " ");
+
+  let core = "";
+  let started = false;
+  let pendingSpace = false;
+  let hadLeading = false;
+  const isSpace = (ch) => ch === " " || ch === "\t" || ch === "\n" || ch === "\r" || ch === "\f" || ch === "\v";
+  for (const ch of raw) {
+    if (ch === "\u00A0") {
+      if (pendingSpace && started) core += " ";
+      pendingSpace = false;
+      started = true;
+      core += ch;
+      continue;
+    }
+    if (isSpace(ch)) {
+      if (!started) hadLeading = true;
+      else pendingSpace = true;
+      continue;
+    }
+    if (pendingSpace && started) core += " ";
+    pendingSpace = false;
+    started = true;
+    core += ch;
+  }
+  if (!core) return "";
+
+  const prev = node.previousSibling;
+  const next = node.nextSibling;
+  const inlineEl = (el) => {
+    if (!el || el.nodeType !== 1 || !view) return false;
+    return isInlineDisplay(view.getComputedStyle(el).display);
+  };
+  const lead = hadLeading && prev && (prev.nodeType === 3 || inlineEl(prev));
+  const tail = pendingSpace && next && (next.nodeType === 3 || inlineEl(next));
+  return `${lead ? " " : ""}${core}${tail ? " " : ""}`;
 }
 
 function followPiece(el) {
@@ -150,7 +277,12 @@ function wait(ms, isCancelled) {
 
 function scaled(ms, speed) {
   const pace = Math.max(0.35, Number(speed) || 1);
-  return Math.max(90, Math.round(ms / pace));
+  return Math.max(70, Math.round(ms / Math.min(pace, 16)));
+}
+
+function typeDelay(speed) {
+  const pace = Math.max(0.35, Number(speed) || 1);
+  return Math.max(8, Math.round(28 / Math.min(pace, 8)));
 }
 
 function injectDirectorStyle(doc) {
@@ -161,6 +293,7 @@ function injectDirectorStyle(doc) {
     doc.head?.appendChild(style);
   }
   style.textContent = DIRECTOR_CSS;
+  doc.head?.appendChild(style);
   return style;
 }
 
@@ -171,38 +304,187 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
   if (!doc?.body) return null;
   injectDirectorStyle(doc);
 
-  const pieces = collectPieces(doc.body);
-  const groups = pieces.map((el) => [el]);
   const siteStyles = [...doc.querySelectorAll("style[data-gitreplay-site]")];
+  const setStyles = (count) => {
+    siteStyles.forEach((style, index) => {
+      if (index < count) style.removeAttribute("media");
+      else style.setAttribute("media", "not all");
+    });
+  };
+  setStyles(siteStyles.length);
+
   const pageScripts = scripts.filter((script) => script?.content?.trim());
-  if (!groups.length && !siteStyles.length && !pageScripts.length) return null;
+  const boxes = [];
+  const steps = [];
+  let textRestored = false;
 
-  doc.documentElement.classList.add("gitreplay-assembling");
-  for (const el of pieces) el.classList.add("gitreplay-piece");
+  const restoreTypedText = () => {
+    if (textRestored) return;
+    textRestored = true;
+    const spans = [...doc.querySelectorAll("span.gitreplay-ch")];
+    for (const span of spans) {
+      const parent = span.parentNode;
+      if (!parent) continue;
+      parent.replaceChild(doc.createTextNode(span.textContent ?? ""), span);
+    }
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      let next = node.nextSibling;
+      while (next && next.nodeType === 3) {
+        node.nodeValue += next.nodeValue;
+        const drop = next;
+        next = next.nextSibling;
+        drop.remove();
+      }
+    }
+  };
 
-  const beats = groups.map((group) => {
-    const caption = pieceCaption(group);
-    return {
+  const track = (el, pinned) => {
+    el.classList.add("gitreplay-box");
+    if (pinned) el.classList.add("gitreplay-in");
+    boxes.push(el);
+  };
+
+  const pushBox = (el, quick) => {
+    const caption = boxCaption(el);
+    steps.push({
+      el,
       label: caption.label,
       detail: caption.detail,
-      commit() {
-        for (const el of group) el.classList.add("gitreplay-in");
+      render(on) {
+        el.classList.toggle("gitreplay-in", on);
       },
       async play(ctx) {
         if (ctx.isCancelled()) return;
-        for (const el of group) el.classList.add("gitreplay-in");
-        followPiece(group[0]);
-        await wait(scaled(240, ctx.speed), ctx.isCancelled);
+        el.classList.add("gitreplay-in");
+        if (!quick) followPiece(el);
+        const pace = Math.max(0.35, Number(ctx.speed) || 1);
+        const hold = quick ? Math.max(16, Math.round(40 / Math.min(pace, 8))) : scaled(180, ctx.speed);
+        await wait(hold, ctx.isCancelled);
       },
-    };
-  });
+    });
+  };
+
+  const writeTextNode = (el, node) => {
+    const text = displayedText(node);
+    if (!text) return;
+    const words = [];
+    const tokens = text.match(/\s+|\S+/g) || [];
+    let carry = "";
+    for (const token of tokens) {
+      if (!token.trim()) {
+        if (words.length) words[words.length - 1] += token;
+        else carry += token;
+        continue;
+      }
+      words.push(carry + token);
+      carry = "";
+    }
+    if (carry) {
+      if (words.length) words[words.length - 1] += carry;
+      else words.push(carry);
+    }
+
+    const frag = doc.createDocumentFragment();
+    for (const word of words) {
+      const shown = word.trim().slice(0, 42);
+      const chars = [];
+      for (const ch of word) {
+        const span = doc.createElement("span");
+        span.className = "gitreplay-ch";
+        span.textContent = ch;
+        frag.appendChild(span);
+        chars.push(span);
+      }
+      if (!shown) {
+        for (const ch of chars) ch.classList.add("gitreplay-in");
+        continue;
+      }
+      steps.push({
+        el,
+        label: "Typing",
+        detail: shown,
+        render(on) {
+          for (const ch of chars) ch.classList.toggle("gitreplay-in", on);
+        },
+        async play(ctx) {
+          const delay = typeDelay(ctx.speed);
+          const burst = shown.length > 28 || (Number(ctx.speed) || 1) >= 4 ? 2 : 1;
+          for (let i = 0; i < chars.length; ) {
+            if (ctx.isCancelled()) return;
+            for (let n = 0; n < burst && i < chars.length; n += 1, i += 1) {
+              chars[i].classList.add("gitreplay-in");
+            }
+            await wait(delay, ctx.isCancelled);
+          }
+        },
+      });
+    }
+    node.parentNode?.replaceChild(frag, node);
+  };
+
+  const pushValue = (el, full) => {
+    el.value = "";
+    steps.push({
+      el,
+      label: "Typing",
+      detail: full.slice(0, 42),
+      render(on) {
+        el.value = on ? full : "";
+      },
+      async play(ctx) {
+        const delay = typeDelay(ctx.speed);
+        const burst = full.length > 28 || (Number(ctx.speed) || 1) >= 4 ? 2 : 1;
+        for (let i = 0; i < full.length; ) {
+          if (ctx.isCancelled()) return;
+          i = Math.min(full.length, i + burst);
+          el.value = full.slice(0, i);
+          await wait(delay, ctx.isCancelled);
+        }
+      },
+    });
+  };
+
+  const visit = (el) => {
+    if (!el || el.nodeType !== 1 || el.classList.contains("gitreplay-ch") || isSkippable(el) || !isShown(el)) return;
+    const view = el.ownerDocument?.defaultView;
+    const cs = view?.getComputedStyle(el);
+    if (!cs) return;
+    const tag = el.tagName;
+
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      track(el, false);
+      pushBox(el, false);
+      const inputType = tag === "TEXTAREA" ? "text" : (el.getAttribute("type") || "").toLowerCase();
+      const full = TEXT_INPUT_TYPES.has(inputType) ? el.value || "" : "";
+      if (full.trim()) pushValue(el, full);
+      return;
+    }
+
+    if (ATOMIC_TAGS.has(tag)) {
+      track(el, false);
+      pushBox(el, false);
+      return;
+    }
+
+    const place = shouldPlace(el, cs);
+    const kids = [...el.childNodes];
+    const textOnly = /^(P|LI|BLOCKQUOTE|FIGCAPTION|PRE|DD|DT|LABEL|H[1-6])$/.test(tag) && !hasOwnChrome(cs);
+    track(el, !place);
+    if (place) pushBox(el, textOnly);
+    for (const node of kids) {
+      if (node.nodeType === 3) writeTextNode(el, node);
+      else if (node.nodeType === 1) visit(node);
+    }
+  };
+
+  for (const child of [...doc.body.children]) visit(child);
 
   const scriptsStarted = new Set();
   const startScripts = (index) => {
-    if (index == null) {
-      pageScripts.forEach((_, scriptIndex) => startScripts(scriptIndex));
-      return;
-    }
+    restoreTypedText();
     if (scriptsStarted.has(index)) return;
     const script = pageScripts[index];
     if (!script?.content?.trim()) return;
@@ -213,69 +495,48 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
     doc.body.appendChild(el);
   };
 
-  const setStyles = (count) => {
-    siteStyles.forEach((style, index) => {
-      if (index < count) style.removeAttribute("media");
-      else style.setAttribute("media", "not all");
-    });
-  };
-
-  siteStyles.forEach((style, index) => {
-    const name = style.getAttribute("data-gitreplay-name") || `stylesheet ${index + 1}`;
-    beats.push({
-      label: "Applying styles",
-      detail: name,
-      commit() {
-        style.removeAttribute("media");
-      },
-      async play(ctx) {
-        if (ctx.isCancelled()) return;
-        style.removeAttribute("media");
-        await wait(scaled(320, ctx.speed), ctx.isCancelled);
-      },
-    });
-  });
-
   pageScripts.forEach((script, index) => {
-    beats.push({
+    steps.push({
+      el: null,
       label: "Starting scripts",
       detail: script.name || `script ${index + 1}`,
-      commit() {
-        startScripts(index);
+      render(on) {
+        if (on) startScripts(index);
       },
       async play(ctx) {
         if (ctx.isCancelled()) return;
         startScripts(index);
-        await wait(scaled(280, ctx.speed), ctx.isCancelled);
+        await wait(scaled(220, ctx.speed), ctx.isCancelled);
       },
     });
   });
 
-  const pieceCount = groups.length;
+  if (!steps.length) return null;
+  doc.documentElement.classList.add("gitreplay-assembling");
 
   return {
-    beats,
+    beats: steps.map((step) => ({
+      label: step.label,
+      detail: step.detail,
+      commit() {
+        step.render(true);
+      },
+      play: (ctx) => step.play(ctx),
+    })),
     renderInstant(count) {
-      const end = Math.max(0, Math.min(beats.length, count));
+      const end = Math.max(0, Math.min(steps.length, count));
       doc.documentElement.classList.add("gitreplay-instant");
-      groups.forEach((group, index) => {
-        for (const el of group) el.classList.toggle("gitreplay-in", index < Math.min(end, pieceCount));
-      });
-      const styleCount = Math.max(0, Math.min(siteStyles.length, end - pieceCount));
-      setStyles(styleCount);
-      const scriptStart = pieceCount + siteStyles.length;
-      for (let index = 0; index < pageScripts.length; index += 1) {
-        if (end > scriptStart + index) startScripts(index);
-      }
+      steps.forEach((step, index) => step.render(index < end));
       doc.documentElement.classList.remove("gitreplay-instant");
-      const current = groups[Math.min(end, pieceCount) - 1]?.[0];
-      if (current) followPiece(current);
+      const current = [...steps.slice(0, end)].reverse().find((step) => step.el);
+      if (current?.el) followPiece(current.el);
     },
     cleanup() {
+      restoreTypedText();
       doc.documentElement.classList.remove("gitreplay-assembling", "gitreplay-instant");
       doc.documentElement.style.opacity = "";
       doc.documentElement.style.transition = "";
-      for (const el of pieces) el.classList.remove("gitreplay-piece", "gitreplay-in");
+      for (const el of boxes) el.classList.remove("gitreplay-box", "gitreplay-in");
       setStyles(siteStyles.length);
       doc.getElementById("gitreplay-director-style")?.remove();
     },
