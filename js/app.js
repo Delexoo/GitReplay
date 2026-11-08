@@ -3197,7 +3197,7 @@ async function finishVisualReplay(session) {
   try {
     session.show.cleanup();
   } catch {
-    /* remount replaces this document */
+    /* the preview frame may already have moved on */
   }
   preview.setHold(false);
   state.visualReplay = null;
@@ -3205,26 +3205,10 @@ async function finishVisualReplay(session) {
   hideEditCaption();
 
   if (state.parallelWeb) {
-    for (const file of state.parallelWeb.files) {
-      file.i = file.full.length;
-      preview.setFile(file.path, file.full);
-    }
-  }
-  const htmlFile = state.parallelWeb?.files.find((file) => file.path === htmlPath);
-  state.replayPath = htmlPath;
-  state.replayContent = htmlFile?.full ?? state.loadedFiles.get(htmlPath) ?? "";
-  preview.invalidate();
-  try {
-    await preview.refreshAsync(
-      htmlPath,
-      previewRefreshOptions({
-        liveBuild: false,
-        forceMount: true,
-        bundle: getPreviewBundle(),
-      })
-    );
-  } catch {
-    /* the edited page is already on screen */
+    for (const file of state.parallelWeb.files) file.i = file.full.length;
+    const htmlFile = state.parallelWeb.files.find((file) => file.path === htmlPath);
+    state.replayPath = htmlPath;
+    state.replayContent = htmlFile?.full ?? state.loadedFiles.get(htmlPath) ?? "";
   }
   state.parallelWeb = null;
   updateReplayUI();
