@@ -66,6 +66,17 @@
 
     <div id="error-banner" class="error-banner hidden"></div>
 
+    <div id="experience-prompt" class="experience-prompt hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="exp-title">
+      <div class="experience-card">
+        <p class="experience-kicker">Personalized for this repo</p>
+        <h1 id="exp-title" class="experience-title" data-exp-title>Analyzing…</h1>
+        <p class="experience-summary" data-exp-summary></p>
+        <p class="experience-meta" data-exp-meta></p>
+        <div class="experience-modes" data-exp-modes></div>
+        <button type="button" class="experience-skip" data-exp-skip>Browse files instead</button>
+      </div>
+    </div>
+
     <main id="workspace" class="workspace">
       <section class="panel panel-files">
         <div class="panel-head">
@@ -111,6 +122,7 @@
         <div class="panel-head panel-head-preview">
           <span class="panel-title">Live preview</span>
           <div class="panel-head-end">
+            <span id="site-tour-label" class="panel-meta site-tour-label hidden"></span>
             <span id="preview-status" class="panel-meta">—</span>
             <button
               id="preview-fullscreen-btn"
@@ -135,14 +147,26 @@
             </button>
           </div>
         </div>
-        <div class="preview-wrap">
-          <iframe id="preview-frame" title="Live preview" sandbox="allow-scripts allow-same-origin"></iframe>
-          <div id="preview-empty" class="preview-empty">
-            <p>Double-click HTML, CSS, JS, React/TSX, or open a README to preview here.</p>
+        <div id="site-tour-bar" class="site-tour-bar hidden" aria-live="polite">
+          <span id="site-tour-bar-label">Website tour</span>
+          <div id="site-tour-pages" class="site-tour-pages"></div>
+        </div>
+        <div class="preview-stage" id="preview-stage">
+          <div class="os-chrome hidden" id="os-chrome" aria-hidden="true">
+            <div class="os-titlebar">
+              <span class="os-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span id="os-window-title" class="os-window-title">App</span>
+            </div>
           </div>
-          <div id="preview-building" class="preview-building hidden" aria-live="polite">
-            <span class="preview-building-spinner" aria-hidden="true"></span>
-            <span>Building...</span>
+          <div class="preview-wrap">
+            <iframe id="preview-frame" title="Live preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+            <div id="preview-empty" class="preview-empty">
+              <p>Double-click HTML, CSS, JS, React/TSX, or open a README to preview here.</p>
+            </div>
+            <div id="preview-building" class="preview-building hidden" aria-live="polite">
+              <span class="preview-building-spinner" aria-hidden="true"></span>
+              <span>Building...</span>
+            </div>
           </div>
         </div>
         <div id="preview-replay-dock" class="preview-replay-dock" aria-label="Replay controls"></div>

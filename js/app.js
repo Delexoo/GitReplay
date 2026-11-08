@@ -27,6 +27,8 @@ import {
   usesLivePreview,
 } from "./content-kind.js";
 import { initPanelResize, initStackResize, equalizeStackSplit, equalizeWorkspacePanels } from "./resize.js";
+import { analyzeRepo, findPackageJsonPath, findReadmePath } from "./repo-analyze.js";
+import { createExperiencePrompt, renderSiteTourPages, setDesktopChrome } from "./experience.js";
 
 const state = {
   parsed: null,
@@ -59,6 +61,9 @@ const state = {
   replayAllPaths: null,
   replayAllIndex: 0,
   raceMode: null,
+  analysis: null,
+  experienceMode: null,
+  siteTour: null,
   collapsedFolders: new Set(),
   lastPreviewHtmlPath: null,
   lastSession: null,
@@ -108,6 +113,14 @@ const els = {
   accountChip: document.getElementById("account-chip"),
   accountLabel: document.getElementById("account-label"),
   signOutBtn: document.getElementById("sign-out-btn"),
+  experiencePrompt: document.getElementById("experience-prompt"),
+  previewStage: document.getElementById("preview-stage"),
+  osChrome: document.getElementById("os-chrome"),
+  osWindowTitle: document.getElementById("os-window-title"),
+  siteTourBar: document.getElementById("site-tour-bar"),
+  siteTourBarLabel: document.getElementById("site-tour-bar-label"),
+  siteTourPages: document.getElementById("site-tour-pages"),
+  siteTourLabel: document.getElementById("site-tour-label"),
 };
 
 const replayControlsHome = {
@@ -161,6 +174,208 @@ const preview = createPreviewController(
   els.previewEmpty,
   els.previewStatus
 );
+
+const experiencePrompt = els.experiencePrompt
+  ? createExperiencePrompt({
+      root: els.experiencePrompt,
+      onChoose: (modeId) => {
+        void startExperienceMode(modeId);
+      },
+      onDismiss: () => {
+        clearExperienceChrome();
+      },
+    })
+  : null;
+
+function clearExperienceChrome() {
+  state.experienceMode = null;
+  state.siteTour = null;
+  setDesktopChrome(false, {
+    stage: els.previewStage,
+    chrome: els.osChrome,
+  });
+  renderSiteTourPages({
+    bar: els.siteTourBar,
+    pagesEl: els.siteTourPages,
+    pages: [],
+    activeIndex: 0,
+  });
+  if (els.siteTourLabel) {
+    els.siteTourLabel.classList.add("hidden");
+    els.siteTourLabel.textContent = "";
+  }
+}
+
+function updateSiteTourChrome() {
+  const tour = state.siteTour;
+  if (!tour?.pages?.length) {
+    renderSiteTourPages({
+      bar: els.siteTourBar,
+      pagesEl: els.siteTourPages,
+      pages: [],
+      activeIndex: 0,
+    });
+    if (els.siteTourLabel) els.siteTourLabel.classList.add("hidden");
+    return;
+  }
+  const page = tour.pages[tour.index];
+  const label = `Page ${tour.index + 1}/${tour.pages.length}`;
+  if (els.siteTourBarLabel) els.siteTourBarLabel.textContent = "Website tour";
+  if (els.siteTourLabel) {
+    els.siteTourLabel.textContent = label;
+    els.siteTourLabel.classList.remove("hidden");
+  }
+  renderSiteTourPages({
+    bar: els.siteTourBar,
+    pagesEl: els.siteTourPages,
+    pages: tour.pages,
+    activeIndex: tour.index,
+    onSelect: (index) => {
+      if (!state.siteTour) return;
+      if (index === state.siteTour.index) return;
+      void startSiteTourPage(index);
+    },
+  });
+  if (els.previewStatus && page) {
+    els.previewStatus.textContent = page.split("/").pop() || page;
+  }
+}
+
+async function analyzeLoadedRepo() {
+  if (!state.parsed || !state.repoInfo) return null;
+
+  let packageJsonRaw = null;
+  let readmeRaw = null;
+  const pkgPath = findPackageJsonPath(state.fileTree);
+  const readmePath = findReadmePath(state.fileTree);
+
+  try {
+    if (pkgPath) packageJsonRaw = await ensureFileContent(pkgPath);
+  } catch {
+    /* optional */
+  }
+  try {
+    if (readmePath) readmeRaw = await ensureFileContent(readmePath);
+  } catch {
+    /* optional */
+  }
+
+  const analysis = analyzeRepo({
+    owner: state.parsed.owner,
+    repo: state.parsed.repo,
+    description: state.repoInfo.description,
+    language: state.repoInfo.language,
+    tree: state.fileTree,
+    packageJsonRaw,
+    readmeRaw,
+  });
+  state.analysis = analysis;
+  return analysis;
+}
+
+async function startExperienceMode(modeId) {
+  if (!state.parsed || !state.repoInfo) return;
+  clearError();
+  clearExperienceChrome();
+
+  if (modeId === "files") {
+    state.experienceMode = "files";
+    await replayAllFiles();
+    return;
+  }
+
+  if (modeId === "site") {
+    state.experienceMode = "site";
+    await startSiteTour();
+    return;
+  }
+
+  if (modeId === "app") {
+    state.experienceMode = "app";
+    await startAppWindowMode();
+  }
+}
+
+async function startSiteTour(startIndex = 0) {
+  const pages =
+    state.analysis?.htmlPages?.length
+      ? state.analysis.htmlPages
+      : collectWebPaths(state.fileTree).filter((p) => WEB.html.test(p));
+
+  if (!pages.length) {
+    showError("No HTML pages found to tour. Try Replay all files instead.");
+    return;
+  }
+
+  state.siteTour = { pages, index: startIndex };
+  updateSiteTourChrome();
+  await startSiteTourPage(startIndex);
+}
+
+async function startSiteTourPage(index) {
+  const pages = state.siteTour?.pages ?? state.analysis?.htmlPages ?? [];
+  if (!pages.length || index < 0 || index >= pages.length) return;
+
+  state.siteTour = { pages, index };
+  updateSiteTourChrome();
+
+  const htmlPath = pages[index];
+  try {
+    await ensurePageBundleLoaded(htmlPath);
+    const targets = buildWebTargets(htmlPath);
+    if (!targets) {
+      showError(`Could not build page ${htmlPath}`);
+      return;
+    }
+    startParallelWebReplay(targets);
+  } catch (err) {
+    handleApiError(err, "Failed to start website tour");
+  }
+}
+
+async function advanceSiteTour() {
+  if (!state.siteTour?.pages?.length) return false;
+  const next = state.siteTour.index + 1;
+  if (next >= state.siteTour.pages.length) {
+    state.isPlaying = false;
+    updateSiteTourChrome();
+    updateReplayUI();
+    return true;
+  }
+  await startSiteTourPage(next);
+  return true;
+}
+
+async function startAppWindowMode() {
+  const htmlPath =
+    state.analysis?.primaryHtml ??
+    collectWebPaths(state.fileTree).filter((p) => WEB.html.test(p))[0] ??
+    null;
+
+  if (!htmlPath) {
+    showError("No interactive UI entry found. Try Replay all files instead.");
+    return;
+  }
+
+  setDesktopChrome(true, {
+    stage: els.previewStage,
+    chrome: els.osChrome,
+    titleEl: els.osWindowTitle,
+    title: state.analysis?.name ?? `${state.parsed.owner}/${state.parsed.repo}`,
+  });
+
+  try {
+    await ensurePageBundleLoaded(htmlPath);
+    const targets = buildWebTargets(htmlPath);
+    if (!targets) {
+      showError("Could not build an interactive preview for this app.");
+      return;
+    }
+    startParallelWebReplay(targets);
+  } catch (err) {
+    handleApiError(err, "Failed to open app window");
+  }
+}
 
 function handleApiError(err, fallback = "Request failed") {
   if (isRateLimitError(err)) {
@@ -2441,6 +2656,12 @@ function runParallelWebLoop() {
       renderTimeline();
       updateDisplay();
       refreshPreviewForPath(htmlPath, state.replayContent, true);
+
+      if (state.experienceMode === "site" && state.siteTour) {
+        window.setTimeout(() => {
+          void advanceSiteTour();
+        }, 900);
+      }
       return;
     }
 
@@ -3196,6 +3417,8 @@ async function loadRepository() {
   state.raceMode = null;
   state.lastPreviewHtmlPath = null;
   state.lastSession = null;
+  clearExperienceChrome();
+  experiencePrompt?.hide();
   preview.clear();
 
   try {
@@ -3218,6 +3441,9 @@ async function loadRepository() {
     updateReplayUI();
     updateAccountUI();
     updateDisplay();
+
+    const analysis = await analyzeLoadedRepo();
+    if (analysis && experiencePrompt) experiencePrompt.show(analysis);
   } catch (err) {
     if (!handleApiError(err, "Failed to load repository") && !state.repoInfo) {
       navigateToWelcome();
