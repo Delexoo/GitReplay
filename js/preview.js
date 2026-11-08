@@ -592,6 +592,8 @@ export function buildPreviewDocument(fileCache, activePath, options = {}) {
     resolveAssetUrl = null,
     bundledScript = null,
     skipScripts = false,
+    assembleAssets = false,
+    extraCss = "",
   } = options;
   if (!fileCache.size && !mediaUrl) return null;
 
@@ -619,11 +621,26 @@ export function buildPreviewDocument(fileCache, activePath, options = {}) {
         bundledScript: skipScripts ? null : bundledScript,
       });
     }
-    return buildAuthenticPreviewDocument(stack.html, stack.htmlPath, resolveAssetUrl, {
+    let doc = buildAuthenticPreviewDocument(stack.html, stack.htmlPath, resolveAssetUrl, {
       bundledScript: skipScripts ? null : bundledScript,
       fileCache,
-      skipScripts,
+      skipScripts: skipScripts || assembleAssets,
     });
+    if (assembleAssets) {
+      doc = stripInlinedLocalAssets(doc, stack.htmlPath, fileCache);
+      const blocks = [];
+      for (const cssPath of stack.cssPaths ?? []) {
+        const css = fileCache.get(cssPath) ?? "";
+        if (!css.trim()) continue;
+        blocks.push({
+          id: "site",
+          css: resolveAssetUrl ? rewriteUrlInCssText(css, cssPath, resolveAssetUrl) : css,
+        });
+      }
+      if (extraCss.trim()) blocks.push({ id: "site", css: extraCss });
+      if (blocks.length) doc = injectStyleBlocks(doc, blocks, { deferred: true });
+    }
+    return doc;
   }
 
   if (building) {
@@ -940,10 +957,11 @@ function escapeScriptText(js) {
   return js.replace(/<\/script/gi, "<\\/script");
 }
 
-function injectStyleBlocks(html, blocks) {
+function injectStyleBlocks(html, blocks, { deferred = false } = {}) {
+  const media = deferred ? ' media="not all"' : "";
   const tags = blocks
     .filter((block) => block.css?.trim())
-    .map((block) => `<style data-gitreplay-${block.id}>${escapeStyleText(block.css)}</style>`)
+    .map((block) => `<style data-gitreplay-${block.id}${media}>${escapeStyleText(block.css)}</style>`)
     .join("");
   if (!tags) return html;
   if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${tags}</head>`);
@@ -1378,6 +1396,8 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
       resolveAssetUrl = null,
       bundledScript = null,
       skipScripts = false,
+      assembleAssets = false,
+      extraCss = "",
     } = options;
     const wasLiveBuild = liveBuildActive;
     liveBuildActive = liveBuild;
@@ -1392,6 +1412,8 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
       resolveAssetUrl,
       bundledScript,
       skipScripts,
+      assembleAssets,
+      extraCss,
     });
 
     if (!doc) {

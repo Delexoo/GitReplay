@@ -220,13 +220,15 @@ function injectDirectorStyle(doc) {
 /**
  * @param {Document} doc
  */
-export function createVisualEditShow(doc) {
+export function createVisualEditShow(doc, { scripts = [] } = {}) {
   if (!doc?.body) return null;
   injectDirectorStyle(doc);
 
   const pieces = collectPieces(doc.body);
   const groups = clusterPieces(pieces).filter((group) => group.length);
-  if (!groups.length) return null;
+  const siteStyles = [...doc.querySelectorAll("style[data-gitreplay-site]")];
+  const pageScripts = scripts.filter((script) => script?.content?.trim());
+  if (!groups.length && !siteStyles.length && !pageScripts.length) return null;
 
   doc.documentElement.classList.add("gitreplay-assembling");
   for (const el of pieces) el.classList.add("gitreplay-piece");
@@ -248,21 +250,97 @@ export function createVisualEditShow(doc) {
     };
   });
 
+  let scriptsStarted = false;
+  const startScripts = () => {
+    if (scriptsStarted || !pageScripts.length) return;
+    scriptsStarted = true;
+    for (const script of pageScripts) {
+      const el = doc.createElement("script");
+      if (script.module) el.type = "module";
+      el.textContent = script.content;
+      doc.body.appendChild(el);
+    }
+  };
+
+  const setStyles = (on) => {
+    for (const style of siteStyles) {
+      if (on) style.removeAttribute("media");
+      else style.setAttribute("media", "not all");
+    }
+  };
+
+  if (siteStyles.length) {
+    beats.push({
+      label: "Applying styles",
+      detail: siteStyles.length === 1 ? "CSS" : `${siteStyles.length} stylesheets`,
+      commit() {
+        setStyles(true);
+      },
+      async play(ctx) {
+        if (ctx.isCancelled()) return;
+        const root = doc.documentElement;
+        const restore = () => {
+          root.style.opacity = "";
+          root.style.transition = "";
+        };
+        root.style.transition = "opacity 0.35s ease";
+        root.style.opacity = "0.02";
+        await wait(scaled(220, ctx.speed), ctx.isCancelled);
+        if (ctx.isCancelled()) {
+          restore();
+          return;
+        }
+        setStyles(true);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (ctx.isCancelled()) {
+          restore();
+          return;
+        }
+        root.style.opacity = "1";
+        await wait(scaled(560, ctx.speed), ctx.isCancelled);
+        root.style.transition = "";
+      },
+    });
+  }
+
+  if (pageScripts.length) {
+    const names = pageScripts.map((script) => script.name).filter(Boolean);
+    beats.push({
+      label: "Starting scripts",
+      detail: names.length === 1 ? names[0] : `${pageScripts.length} files`,
+      commit() {
+        startScripts();
+      },
+      async play(ctx) {
+        if (ctx.isCancelled()) return;
+        startScripts();
+        await wait(scaled(480, ctx.speed), ctx.isCancelled);
+      },
+    });
+  }
+
+  const pieceCount = groups.length;
+
   return {
     beats,
     renderInstant(count) {
       const end = Math.max(0, Math.min(beats.length, count));
       doc.documentElement.classList.add("gitreplay-instant");
       groups.forEach((group, index) => {
-        for (const el of group) el.classList.toggle("gitreplay-in", index < end);
+        for (const el of group) el.classList.toggle("gitreplay-in", index < Math.min(end, pieceCount));
       });
+      setStyles(end > pieceCount);
+      if (end > pieceCount + (siteStyles.length ? 1 : 0)) startScripts();
       doc.documentElement.classList.remove("gitreplay-instant");
-      const current = groups[end - 1]?.[0];
+      const current = groups[Math.min(end, pieceCount) - 1]?.[0];
       if (current) followPiece(current);
     },
     cleanup() {
       doc.documentElement.classList.remove("gitreplay-assembling", "gitreplay-instant");
+      doc.documentElement.style.opacity = "";
+      doc.documentElement.style.transition = "";
       for (const el of pieces) el.classList.remove("gitreplay-piece", "gitreplay-in");
+      setStyles(true);
       doc.getElementById("gitreplay-director-style")?.remove();
     },
   };

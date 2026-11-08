@@ -67,6 +67,7 @@ const state = {
   siteTour: null,
   collapsedFolders: new Set(),
   lastPreviewHtmlPath: null,
+  siteBundle: null,
   lastSession: null,
   progressScrubbing: false,
   scrubWasPlaying: false,
@@ -1526,12 +1527,33 @@ function getHtmlPageBundle(htmlPath) {
   return uniquePaths(bundle);
 }
 
+function directoryOf(path) {
+  const index = path.lastIndexOf("/");
+  return index === -1 ? "" : path.slice(0, index);
+}
+
+function expandSiteFiles(htmlPath) {
+  const available = [...getWebPathCatalog()];
+  const base = getHtmlPageBundle(htmlPath);
+  const dirs = new Set(base.map(directoryOf));
+  const related = available.filter((path) => {
+    if (/(^|\/)node_modules\//.test(path)) return false;
+    if (!isStylePath(path) && !isScriptPath(path)) return false;
+    return dirs.has(directoryOf(path));
+  });
+  return uniquePaths([...base, ...related]);
+}
+
 async function ensurePageBundleLoaded(htmlPath) {
-  for (const filePath of getHtmlPageBundle(htmlPath)) {
-    await ensureFileContent(filePath).catch(() => {});
-  }
   const available = getWebPathCatalog();
-  await loadImportGraph(getHtmlPageBundle(htmlPath), available);
+  let bundle = expandSiteFiles(htmlPath);
+  await loadFilesParallel(bundle);
+  const imported = await loadImportGraph(bundle, available);
+  const more = [...imported].filter(
+    (path) => state.loadedFiles.has(path) && isWebFile(path) && !/(^|\/)node_modules\//.test(path)
+  );
+  bundle = uniquePaths([...bundle, ...more]);
+  state.siteBundle = { htmlPath, paths: bundle };
 }
 
 function getAssetParentHtml(assetPath) {
@@ -2917,7 +2939,13 @@ async function loadImportGraph(seedPaths, available) {
       continue;
     }
     if (!isScriptPath(path) && !isStylePath(path)) continue;
-    for (const spec of parseRelativeImports(content)) {
+    const specs = parseRelativeImports(content);
+    if (isStylePath(path)) {
+      const importRe = /@import\s+(?:url\(\s*)?['"]([^'"]+)['"]/gi;
+      let match;
+      while ((match = importRe.exec(content))) specs.push(match[1]);
+    }
+    for (const spec of specs) {
       const resolved = resolveAssetPath(spec, path, available);
       if (resolved && !seen.has(resolved)) queue.push(resolved);
     }
@@ -3079,7 +3107,8 @@ function buildWebTargets(activePath) {
     : pickPrimaryHtml(activePath, htmlPaths);
   if (!htmlPath || !state.loadedFiles.has(htmlPath)) return null;
 
-  const bundle = getHtmlPageBundle(htmlPath);
+  const bundle =
+    state.siteBundle?.htmlPath === htmlPath ? state.siteBundle.paths : getHtmlPageBundle(htmlPath);
   const files = bundle
     .filter((p) => state.loadedFiles.has(p))
     .map((p) => ({
@@ -3229,6 +3258,34 @@ async function runVisualEditReplay() {
   const ready = preview.whenDocumentReady();
   for (const file of state.parallelWeb.files) preview.setFile(file.path, file.full);
 
+  let extraCss = "";
+  let pageScripts = [];
+  const bundle = getPreviewBundle();
+  try {
+    const bundled = await preview.resolvePreviewBundle(htmlPath, { bundle, liveBuild: false });
+    if (bundled?.css?.trim()) extraCss = bundled.css;
+    if (bundled?.js?.trim()) {
+      pageScripts = [{ content: bundled.js, module: true, name: "app.js" }];
+    }
+  } catch {
+    /* source CSS and JS still play */
+  }
+  if (!pageScripts.length) {
+    pageScripts = (state.parallelWeb.jsPaths ?? [])
+      .map((path) => {
+        const content =
+          state.loadedFiles.get(path) ??
+          state.parallelWeb.files.find((file) => file.path === path)?.full ??
+          "";
+        return {
+          content,
+          module: /^\s*(?:import|export)\s/m.test(content),
+          name: path.split("/").pop() || path,
+        };
+      })
+      .filter((script) => script.content.trim());
+  }
+
   try {
     await preview.refreshAsync(
       htmlPath,
@@ -3236,7 +3293,9 @@ async function runVisualEditReplay() {
         liveBuild: false,
         forceMount: true,
         skipScripts: true,
-        bundle: getPreviewBundle(),
+        assembleAssets: true,
+        extraCss,
+        bundle,
       })
     );
     const doc = await Promise.race([
@@ -3253,7 +3312,7 @@ async function runVisualEditReplay() {
     }
 
     await waitForPreviewImages(doc);
-    const show = createVisualEditShow(doc);
+    const show = createVisualEditShow(doc, { scripts: pageScripts });
     if (!show || !state.parallelWeb) {
       preview.setHold(false);
       return false;
@@ -3664,7 +3723,8 @@ async function loadRepository() {
   state.parallelWeb = null;
   state.raceMode = null;
   state.lastPreviewHtmlPath = null;
-  state.lastSession = null;
+  state.siteBundle = null;
+  state.lastSession = null
   clearExperienceChrome();
   experiencePrompt?.hide();
   preview.clear();
