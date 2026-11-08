@@ -7,6 +7,7 @@ function allowedReturns() {
     .filter(Boolean);
   return [
     "https://delexoo.github.io",
+    "https://gitreplay-red.vercel.app",
     "http://localhost",
     "http://127.0.0.1",
     ...extras,

@@ -104,13 +104,21 @@ async function handleOAuthReturn() {
   return true;
 }
 
+function connectReturnUrl() {
+  const host = location.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "delexoo.github.io") {
+    return new URL("index.html", location.href).href;
+  }
+  // Always send users back to the live Pages app (not the auth API host).
+  return "https://delexoo.github.io/GitReplay/index.html";
+}
+
 function startGitHubConnect() {
   clearError();
   const state = randomState();
   setOAuthState(state);
-  const returnTo = new URL("index.html", location.href).href;
   const login = new URL("/api/github/login", AUTH_API_ORIGIN);
-  login.searchParams.set("return", returnTo);
+  login.searchParams.set("return", connectReturnUrl());
   login.searchParams.set("state", state);
   location.href = login.toString();
 }
