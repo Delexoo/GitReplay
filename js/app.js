@@ -187,6 +187,14 @@ const experiencePrompt = els.experiencePrompt
     })
   : null;
 
+function isPreviewOnlyExperience() {
+  return state.experienceMode === "site" || state.experienceMode === "app";
+}
+
+function syncWorkspaceLayout() {
+  els.workspace?.classList.toggle("is-preview-only", isPreviewOnlyExperience());
+}
+
 function clearExperienceChrome() {
   state.experienceMode = null;
   state.siteTour = null;
@@ -204,6 +212,12 @@ function clearExperienceChrome() {
     els.siteTourLabel.classList.add("hidden");
     els.siteTourLabel.textContent = "";
   }
+  syncWorkspaceLayout();
+}
+
+function leavePreviewOnlyExperience() {
+  if (!isPreviewOnlyExperience()) return;
+  clearExperienceChrome();
 }
 
 function updateSiteTourChrome() {
@@ -280,18 +294,21 @@ async function startExperienceMode(modeId) {
 
   if (modeId === "files") {
     state.experienceMode = "files";
+    syncWorkspaceLayout();
     await replayAllFiles();
     return;
   }
 
   if (modeId === "site") {
     state.experienceMode = "site";
+    syncWorkspaceLayout();
     await startSiteTour();
     return;
   }
 
   if (modeId === "app") {
     state.experienceMode = "app";
+    syncWorkspaceLayout();
     await startAppWindowMode();
   }
 }
@@ -303,6 +320,7 @@ async function startSiteTour(startIndex = 0) {
       : collectWebPaths(state.fileTree).filter((p) => WEB.html.test(p));
 
   if (!pages.length) {
+    leavePreviewOnlyExperience();
     showError("No HTML pages found to tour. Try Replay all files instead.");
     return;
   }
@@ -353,6 +371,7 @@ async function startAppWindowMode() {
     null;
 
   if (!htmlPath) {
+    leavePreviewOnlyExperience();
     showError("No interactive UI entry found. Try Replay all files instead.");
     return;
   }
@@ -2032,6 +2051,7 @@ function runRaceLoop() {
 
 async function startRace() {
   if (!state.parsed || !state.repoInfo) return;
+  leavePreviewOnlyExperience();
 
   const kind = els.raceKindSelect.value;
   const paths = collectPathsByKind(state.fileTree, kind);
@@ -3140,6 +3160,7 @@ function startFileReplay(steps) {
 
 async function replayFile(path) {
   if (!state.parsed || !state.repoInfo) return;
+  leavePreviewOnlyExperience();
 
   clearError();
   clearTimers();
@@ -3189,6 +3210,7 @@ function shouldSkipInReplayAll(path) {
 
 async function replayAllFiles() {
   if (!state.parsed || !state.repoInfo) return;
+  leavePreviewOnlyExperience();
 
   const paths = uniquePaths(
     collectFilePaths(state.fileTree).filter((p) => !shouldSkipInReplayAll(p))
@@ -3226,6 +3248,7 @@ async function replayAllFiles() {
 
 async function selectFile(path) {
   if (!state.parsed || !state.repoInfo) return;
+  leavePreviewOnlyExperience();
 
   state.selectedPath = path;
   state.viewMode = "browse";

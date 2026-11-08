@@ -612,6 +612,18 @@ body.prompt-page .welcome {
   min-width: 140px;
 }
 
+.workspace.is-preview-only > .panel-files,
+.workspace.is-preview-only > .panel-code,
+.workspace.is-preview-only > .resize-handle {
+  display: none;
+}
+
+.workspace.is-preview-only > .panel-preview {
+  flex: 1 1 auto;
+  max-width: none;
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .panel-files,
   .panel-code,
