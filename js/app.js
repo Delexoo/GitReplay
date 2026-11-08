@@ -29,7 +29,7 @@ import {
 import { initPanelResize, initStackResize, equalizeStackSplit, equalizeWorkspacePanels } from "./resize.js";
 import { analyzeRepo, findPackageJsonPath, findReadmePath } from "./repo-analyze.js";
 import { createExperiencePrompt, renderSiteTourPages, setDesktopChrome } from "./experience.js";
-import { createVisualEditShow, waitForPreviewImages } from "./visual-replay.js";
+import { createVisualEditShow, prepareLandingPage, waitForPreviewImages } from "./visual-replay.js";
 
 const state = {
   parsed: null,
@@ -3312,6 +3312,11 @@ async function runVisualEditReplay() {
     }
 
     await waitForPreviewImages(doc);
+    pageScripts = await prepareLandingPage(doc, pageScripts);
+    if (!state.isPlaying || !state.parallelWeb || state.parallelWeb.htmlPath !== htmlPath) {
+      preview.setHold(false);
+      return false;
+    }
     const show = createVisualEditShow(doc, { scripts: pageScripts });
     if (!show || !state.parallelWeb) {
       preview.setHold(false);

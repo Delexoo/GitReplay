@@ -4,6 +4,8 @@
  * Layout stays put: pieces only change opacity, so the page does not jump.
  */
 
+import { revealLandingPage } from "./preview.js";
+
 const DIRECTOR_CSS = `
 html.gitreplay-assembling,
 html.gitreplay-assembling body {
@@ -44,6 +46,11 @@ html.gitreplay-assembling span.gitreplay-ch.gitreplay-in {
 html.gitreplay-assembling.gitreplay-instant .gitreplay-box,
 html.gitreplay-assembling.gitreplay-instant span.gitreplay-ch {
   transition: none !important;
+}
+html.gitreplay-assembling [data-gitreplay-loader] {
+  display: none !important;
+  visibility: hidden !important;
+  animation: none !important;
 }
 `;
 
@@ -285,6 +292,61 @@ function typeDelay(speed) {
   return Math.max(8, Math.round(28 / Math.min(pace, 8)));
 }
 
+function landingContentVisible(doc) {
+  const view = doc.defaultView;
+  if (!view) return false;
+  const text = (doc.body?.innerText || "").replace(/\s+/g, " ").trim();
+  if (text.length >= 24 && !/^(loading|please wait|just a moment)(\.{0,3}|…)?$/i.test(text)) return true;
+  const nodes = doc.body?.querySelectorAll("h1,h2,p,a,button,img,video,canvas,svg") ?? [];
+  for (const el of nodes) {
+    if (el.closest("[data-gitreplay-loader]")) continue;
+    const cs = view.getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 12 && rect.height > 12) return true;
+  }
+  return false;
+}
+
+async function bootLandingScripts(doc, scripts) {
+  for (const script of scripts) {
+    if (!script?.content?.trim() || !doc.body) continue;
+    try {
+      const el = doc.createElement("script");
+      if (script.module) el.type = "module";
+      el.textContent = script.content;
+      doc.body.appendChild(el);
+    } catch {
+      /* the page can still reveal without this file */
+    }
+  }
+  const start = Date.now();
+  while (Date.now() - start < 2400) {
+    if (landingContentVisible(doc)) return;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  }
+}
+
+/**
+ * Drops startup loaders. If the HTML is only a loader, runs the page scripts
+ * once so the real landing page can render before the replay builds it.
+ */
+function enableSiteStyles(doc) {
+  for (const style of doc.querySelectorAll("style[data-gitreplay-site]")) {
+    style.removeAttribute("media");
+  }
+}
+
+export async function prepareLandingPage(doc, scripts = []) {
+  if (!doc?.body) return scripts;
+  enableSiteStyles(doc);
+  const hidden = revealLandingPage(doc);
+  if (!hidden || landingContentVisible(doc) || !scripts.length) return scripts;
+  await bootLandingScripts(doc, scripts);
+  revealLandingPage(doc);
+  return [];
+}
+
 function injectDirectorStyle(doc) {
   let style = doc.getElementById("gitreplay-director-style");
   if (!style) {
@@ -312,6 +374,7 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
     });
   };
   setStyles(siteStyles.length);
+  revealLandingPage(doc);
 
   const pageScripts = scripts.filter((script) => script?.content?.trim());
   const boxes = [];
@@ -493,6 +556,7 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
     if (script.module) el.type = "module";
     el.textContent = script.content;
     doc.body.appendChild(el);
+    revealLandingPage(doc);
   };
 
   pageScripts.forEach((script, index) => {
@@ -533,6 +597,7 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
     },
     cleanup() {
       restoreTypedText();
+      revealLandingPage(doc);
       doc.documentElement.classList.remove("gitreplay-assembling", "gitreplay-instant");
       doc.documentElement.style.opacity = "";
       doc.documentElement.style.transition = "";

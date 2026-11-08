@@ -808,6 +808,131 @@ function closeOpenElementTags(html) {
   return html + closers;
 }
 
+const LOADER_TOKEN =
+  /^(?:pre[-_]?loader|page[-_]?loader|loader|splash(?:[-_]?screen)?|splashscreen|loading[-_](?:screen|overlay|page|wrapper|wrap)|load[-_]?screen|(?:app|site|page|initial|boot|startup)[-_]loader|loader[-_](?:wrapper|wrap|screen|overlay|container|main|box))$/i;
+
+function loaderTokenKind(token) {
+  if (LOADER_TOKEN.test(token)) return "strong";
+  if (/^(?:loading|is-loading|preload|preloading)$/i.test(token)) return "weak";
+  return "";
+}
+
+function isPageControl(el) {
+  return /^(A|BUTTON|INPUT|TEXTAREA|SELECT|LABEL)$/.test(el.tagName);
+}
+
+function coversViewport(el) {
+  const view = el.ownerDocument?.defaultView;
+  if (!view) return false;
+  const rect = el.getBoundingClientRect();
+  const width = view.innerWidth || 1;
+  const height = view.innerHeight || 1;
+  return rect.width >= width * 0.72 && rect.height >= height * 0.72;
+}
+
+function isOverlay(el) {
+  const view = el.ownerDocument?.defaultView;
+  if (!view) return false;
+  const cs = view.getComputedStyle(el);
+  if (cs.display === "none" || cs.visibility === "hidden") return false;
+  const posed = cs.position === "fixed" || cs.position === "absolute" || cs.position === "sticky";
+  if (!posed) return false;
+  return coversViewport(el) || (Number(cs.zIndex) || 0) >= 20;
+}
+
+function containsRealPage(el) {
+  const headings = [...el.querySelectorAll("h1,h2")]
+    .map((node) => (node.textContent || "").trim())
+    .filter((text) => text && !/^(loading|please wait|just a moment)/i.test(text));
+  if (headings.length) return true;
+  return [...el.querySelectorAll("p")].some((node) => (node.textContent || "").trim().length > 40);
+}
+
+function shouldHideLoader(el) {
+  if (!el || el.nodeType !== 1) return false;
+  if (el.tagName === "BODY" || el.tagName === "HTML" || el.closest("head")) return false;
+  if (isPageControl(el) || el.closest("button, a, label")) return false;
+
+  const id = el.id || "";
+  const tokens = [id, ...el.classList];
+  let kind = "";
+  for (const token of tokens) {
+    const next = loaderTokenKind(token);
+    if (next === "strong") kind = "strong";
+    else if (next === "weak" && kind !== "strong") kind = "weak";
+  }
+  if (/^(?:loading|loader|preloader|preload|splash|splashscreen)$/i.test(id)) kind = "strong";
+  if (el.hasAttribute("data-loading-screen") || el.hasAttribute("data-preloader")) kind = "strong";
+  if (el.classList.contains("login-redirect-msg")) kind = "strong";
+
+  const pageInside = () => containsRealPage(el);
+  if (kind === "strong") return !pageInside() || isOverlay(el) || coversViewport(el);
+  if (kind === "weak") return !pageInside() && (isOverlay(el) || coversViewport(el));
+  if (!coversViewport(el)) return false;
+  const text = (el.innerText || "").trim();
+  return !pageInside() && /^(loading|please wait|just a moment)(\.{0,3}|…)?$/i.test(text);
+}
+
+/**
+ * Hides startup loaders and unlocks the landing page underneath them.
+ * @returns {number} how many loader elements were hidden
+ */
+export function revealLandingPage(doc) {
+  if (!doc?.body) return 0;
+  const root = doc.documentElement;
+  const body = doc.body;
+  for (const node of [root, body]) {
+    node.classList.remove(
+      "loading",
+      "is-loading",
+      "preload",
+      "preloading",
+      "is-preload",
+      "unloaded",
+      "no-js"
+    );
+    node.classList.add("loaded", "is-loaded", "js", "ready", "is-ready", "page-loaded");
+  }
+
+  let hidden = 0;
+  const hide = (el) => {
+    if (!el || el.hasAttribute("data-gitreplay-loader")) return;
+    el.setAttribute("data-gitreplay-loader", "");
+    el.style.setProperty("display", "none", "important");
+    el.style.setProperty("visibility", "hidden", "important");
+    hidden += 1;
+  };
+
+  for (const el of [...body.querySelectorAll("*")]) {
+    if (shouldHideLoader(el)) hide(el);
+  }
+
+  const view = doc.defaultView;
+  if (view && hidden) {
+    const bodyStyle = view.getComputedStyle(body);
+    if (bodyStyle.position === "fixed") body.style.setProperty("position", "static", "important");
+    if (bodyStyle.overflow === "hidden" || view.getComputedStyle(root).overflow === "hidden") {
+      root.style.setProperty("overflow", "auto", "important");
+      body.style.setProperty("overflow", "auto", "important");
+    }
+  }
+
+  if (view) {
+    for (const el of doc.querySelectorAll("#app, #root, #__next, #__nuxt, main, header, [role='main']")) {
+      if (el.hasAttribute("data-gitreplay-loader") || el.getAttribute("role") === "dialog") continue;
+      const cs = view.getComputedStyle(el);
+      if (cs.visibility === "hidden" || Number(cs.opacity) === 0) {
+        el.style.setProperty("opacity", "1", "important");
+        el.style.setProperty("visibility", "visible", "important");
+      } else if (cs.display === "none") {
+        el.style.setProperty("display", "revert", "important");
+      }
+    }
+  }
+
+  return hidden;
+}
+
 function runLiveBuildHelpersInDoc(doc) {
   try {
     doc.querySelectorAll("template").forEach((t) => {
@@ -818,14 +943,7 @@ function runLiveBuildHelpersInDoc(doc) {
       t.parentNode.insertBefore(d, t.nextSibling);
       t.dataset.gitreplayShown = "1";
     });
-    doc
-      .querySelectorAll(
-        ".login-redirect-msg,.page-loader,#loader,.preloader,[data-loading-screen]"
-      )
-      .forEach((el) => {
-        if (el.closest("head")) return;
-        el.style.setProperty("display", "none", "important");
-      });
+    revealLandingPage(doc);
   } catch {
     /* ignore */
   }
