@@ -3,152 +3,82 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GitReplay</title>
+    <title>GitReplay — Watch GitHub repos build live</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/style.css" />
   </head>
-  <body>
-    <header class="navbar">
+  <body class="prompt-page">
+    <header class="navbar navbar-prompt">
       <div class="navbar-inner">
-        <a class="navbar-brand" href="welcome.html" title="Load another repository">
+        <a class="navbar-brand" href="index.html">
           <span class="logo">GitReplay</span>
         </a>
-
-        <div id="header-repo" class="navbar-search">
-          <input
-            id="repo-input"
-            type="text"
-            placeholder="github.com/user/repo"
-            autocomplete="off"
-          />
-          <button id="start-btn" type="button" class="btn btn-primary">Load</button>
-        </div>
-
-        <div class="navbar-actions">
-          <div id="nav-tools" class="nav-tools hidden">
-            <button id="replay-all-btn" type="button" class="btn">Replay All</button>
-            <div id="race-controls" class="race-controls">
-              <select id="race-kind-select" class="race-select" title="Race file type">
-                <option value="html">HTML</option>
-                <option value="js">JS</option>
-                <option value="css">CSS</option>
-              </select>
-              <button id="race-btn" type="button" class="btn">Race</button>
-            </div>
-            <button id="replay-btn" type="button" class="btn" disabled title="Replay what you just watched">Replay</button>
-          </div>
-          <div id="account-chip" class="account-chip hidden">
-            <span id="account-label" class="account-label"></span>
-            <button id="sign-out-btn" type="button" class="btn btn-ghost" title="Sign out of GitHub for this tab">
-              Sign out
-            </button>
-          </div>
-          <div id="replay-controls" class="replay-controls hidden">
-            <button id="play-pause-btn" type="button" class="btn">Pause</button>
-            <div class="replay-sliders">
-              <div class="replay-slider-row">
-                <span class="replay-slider-label">Speed</span>
-                <input id="speed-slider" type="range" min="0" max="100" step="1" value="11" title="Replay speed" />
-                <span id="speed-label">1x</span>
-              </div>
-              <div class="replay-slider-row">
-                <span class="replay-slider-label">Progress</span>
-                <input id="progress-slider" type="range" min="0" max="1000" step="1" value="0" disabled title="Seek within current file" />
-                <span id="progress-label">0%</span>
-              </div>
-            </div>
-          </div>
+        <div id="welcome-account" class="navbar-actions hidden">
+          <span id="welcome-user-label" class="account-label"></span>
+          <button id="disconnect-btn" type="button" class="btn btn-ghost">Disconnect</button>
         </div>
       </div>
     </header>
 
     <div id="error-banner" class="error-banner hidden"></div>
 
-    <main id="workspace" class="workspace">
-      <section class="panel panel-files">
-        <div class="panel-head">
-          <span class="panel-title">Files</span>
-          <span id="repo-name" class="panel-meta"></span>
+    <main class="welcome">
+      <div id="landing-guest" class="welcome-screen">
+        <h1 class="welcome-heading">Watch any GitHub repo build live</h1>
+        <p class="welcome-lead">
+          GitReplay opens a repository in your browser, lets you browse the file tree, and
+          replays files as they type out on screen. Web projects also show a live preview as
+          HTML, CSS, and JavaScript are built.
+        </p>
+        <div class="welcome-actions">
+          <button id="connect-github-btn" type="button" class="btn btn-primary btn-connect">
+            Connect with GitHub
+          </button>
         </div>
-        <div id="file-tree" class="file-tree"></div>
-        <div id="timeline" class="timeline hidden">
-          <div class="timeline-row">
-            <button id="prev-step-btn" type="button" class="btn btn-sm" disabled>Prev</button>
-            <span id="step-counter">—</span>
-            <button id="next-step-btn" type="button" class="btn btn-sm" disabled>Next</button>
-          </div>
-          <p id="step-info" class="step-info"></p>
-          <div class="timeline-lists">
-            <div>
-              <span class="label">Done</span>
-              <div id="prev-files" class="mini-list"></div>
-            </div>
-            <div>
-              <span class="label">Next</span>
-              <div id="upcoming-files" class="mini-list"></div>
-            </div>
-          </div>
-        </div>
-      </section>
+        <p class="welcome-note">
+          Reads repositories you can access, including private ones. Session ends when you close this tab.
+        </p>
+      </div>
 
-      <div class="resize-handle" data-index="0" title="Drag to resize"></div>
+      <div id="landing-connected" class="welcome-screen hidden">
+        <h1 class="welcome-heading">Choose a repository</h1>
+        <p class="welcome-lead">
+          Pick one of yours, or paste any GitHub URL you can access.
+        </p>
 
-      <section class="panel panel-code">
-        <div class="panel-head">
-          <span class="panel-title">Code</span>
-          <span id="code-path" class="panel-meta">—</span>
+        <div class="welcome-bar">
+          <input
+            id="repo-welcome-input"
+            type="text"
+            placeholder="github.com/user/repo"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Repository URL"
+          />
+          <button id="repo-welcome-btn" type="button" class="btn btn-primary">Load</button>
         </div>
-        <div id="code-viewer" class="code-viewer">
-          <p class="empty">Source code appears here. Visuals and docs render in Live preview →</p>
-        </div>
-      </section>
 
-      <div class="resize-handle" data-index="1" title="Drag to resize"></div>
-
-      <section id="preview-panel" class="panel panel-preview">
-        <div class="panel-head panel-head-preview">
-          <span class="panel-title">Live preview</span>
-          <div class="panel-head-end">
-            <span id="preview-status" class="panel-meta">—</span>
-            <button
-              id="preview-fullscreen-btn"
-              type="button"
-              class="btn btn-ghost btn-icon"
-              title="Fullscreen"
-              aria-label="Fullscreen preview"
-              aria-pressed="false"
-            >
-              <svg class="icon-enter-fullscreen" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-                <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-                <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-                <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-              </svg>
-              <svg class="icon-exit-fullscreen hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M8 3v3a2 2 0 0 1-2 2H3" />
-                <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
-                <path d="M3 16h3a2 2 0 0 1 2 2v3" />
-                <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
-              </svg>
-            </button>
+        <div class="repo-picker">
+          <div class="repo-picker-head">
+            <label class="repo-picker-label" for="repo-search-input">Your repositories</label>
+            <input
+              id="repo-search-input"
+              type="search"
+              placeholder="Filter…"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Filter repositories"
+            />
+          </div>
+          <div id="repo-list" class="repo-list" role="listbox" aria-label="Your repositories">
+            <p class="repo-list-empty">Loading repositories…</p>
           </div>
         </div>
-        <div class="preview-wrap">
-          <iframe id="preview-frame" title="Live preview" sandbox="allow-scripts allow-same-origin"></iframe>
-          <div id="preview-empty" class="preview-empty">
-            <p>Double-click HTML, CSS, JS, React/TSX, or open a README to preview here.</p>
-          </div>
-          <div id="preview-building" class="preview-building hidden" aria-live="polite">
-            <span class="preview-building-spinner" aria-hidden="true"></span>
-            <span>Building...</span>
-          </div>
-        </div>
-        <div id="preview-replay-dock" class="preview-replay-dock" aria-label="Replay controls"></div>
-      </section>
+      </div>
     </main>
 
-    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/landing-page.js"></script>
   </body>
 </html>

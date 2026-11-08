@@ -1,4 +1,4 @@
-const DEFAULT_RETURN = "https://delexoo.github.io/GitReplay/welcome.html";
+const DEFAULT_RETURN = "https://delexoo.github.io/GitReplay/index.html";
 
 function allowedReturns() {
   const extras = (process.env.GITHUB_OAUTH_RETURN_ORIGINS || "")

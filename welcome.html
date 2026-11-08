@@ -1,84 +1,13 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GitReplay — Watch GitHub repos build live</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/style.css" />
+    <meta http-equiv="refresh" content="0; url=index.html" />
+    <title>Redirecting — GitReplay</title>
+    <link rel="canonical" href="index.html" />
+    <script>location.replace("index.html");</script>
   </head>
-  <body class="prompt-page">
-    <header class="navbar navbar-prompt">
-      <div class="navbar-inner">
-        <a class="navbar-brand" href="welcome.html">
-          <span class="logo">GitReplay</span>
-        </a>
-        <div id="welcome-account" class="navbar-actions hidden">
-          <span id="welcome-user-label" class="account-label"></span>
-          <button id="disconnect-btn" type="button" class="btn btn-ghost">Disconnect</button>
-        </div>
-      </div>
-    </header>
-
-    <div id="error-banner" class="error-banner hidden"></div>
-
-    <main class="welcome">
-      <div id="landing-guest" class="welcome-screen">
-        <h1 class="welcome-heading">Watch any GitHub repo build live</h1>
-        <p class="welcome-lead">
-          GitReplay opens a repository in your browser, lets you browse the file tree, and
-          replays files as they type out on screen. Web projects also show a live preview as
-          HTML, CSS, and JavaScript are built.
-        </p>
-        <div class="welcome-actions">
-          <button id="connect-github-btn" type="button" class="btn btn-primary btn-connect">
-            Connect with GitHub
-          </button>
-        </div>
-        <p class="welcome-note">
-          Reads repositories you can access, including private ones. Session ends when you close this tab.
-        </p>
-      </div>
-
-      <div id="landing-connected" class="welcome-screen hidden">
-        <h1 class="welcome-heading">Choose a repository</h1>
-        <p class="welcome-lead">
-          Pick one of yours, or paste any GitHub URL you can access.
-        </p>
-
-        <div class="welcome-bar">
-          <input
-            id="repo-welcome-input"
-            type="text"
-            placeholder="github.com/user/repo"
-            autocomplete="off"
-            spellcheck="false"
-            aria-label="Repository URL"
-          />
-          <button id="repo-welcome-btn" type="button" class="btn btn-primary">Load</button>
-        </div>
-
-        <div class="repo-picker">
-          <div class="repo-picker-head">
-            <label class="repo-picker-label" for="repo-search-input">Your repositories</label>
-            <input
-              id="repo-search-input"
-              type="search"
-              placeholder="Filter…"
-              autocomplete="off"
-              spellcheck="false"
-              aria-label="Filter repositories"
-            />
-          </div>
-          <div id="repo-list" class="repo-list" role="listbox" aria-label="Your repositories">
-            <p class="repo-list-empty">Loading repositories…</p>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <script type="module" src="js/welcome-page.js"></script>
+  <body>
+    <p><a href="index.html">Continue to GitReplay</a>.</p>
   </body>
 </html>

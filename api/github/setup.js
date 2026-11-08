@@ -4,6 +4,7 @@
  * route stores GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET on Vercel then redeploys.
  */
 const HOMEPAGE = "https://delexoo.github.io/GitReplay/";
+const APP_URL = "https://delexoo.github.io/GitReplay/index.html";
 const AUTH_ORIGIN = "https://gitreplay-red.vercel.app";
 const CALLBACK = `${AUTH_ORIGIN}/api/github/callback`;
 const SETUP_RETURN = `${AUTH_ORIGIN}/api/github/setup`;
@@ -186,7 +187,7 @@ GITHUB_CLIENT_SECRET=${clientSecret}</pre>`;
       ${wireNote}
       <p class="muted">Callback URL: <code>${CALLBACK}</code></p>
       <p class="muted">Homepage: <code>${HOMEPAGE}</code></p>
-      <a class="btn" href="${HOMEPAGE}welcome.html">Open GitReplay</a>
+      <a class="btn" href="${APP_URL}">Open GitReplay</a>
       `
     );
     res.statusCode = 200;

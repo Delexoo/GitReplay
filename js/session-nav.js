@@ -55,10 +55,20 @@ export function getCachedGitHubUser() {
   }
 }
 
-export function navigateToWelcome() {
-  location.href = "welcome.html";
+export function navigateToHome() {
+  location.href = "index.html";
 }
 
+/** @deprecated use navigateToHome */
+export function navigateToWelcome() {
+  navigateToHome();
+}
+
+export function navigateToReplay() {
+  location.href = "replay.html";
+}
+
+/** @deprecated use navigateToReplay */
 export function navigateToApp() {
-  location.href = "index.html";
+  navigateToReplay();
 }

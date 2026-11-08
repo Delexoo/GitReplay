@@ -8,13 +8,13 @@
 </p>
 
 <p align="center">
-  <a href="https://delexoo.github.io/GitReplay/welcome.html"><img src="https://img.shields.io/badge/Live_Demo-Open_GitReplay-2ea043?style=for-the-badge&logo=github&logoColor=white" alt="Open GitReplay" /></a>
+  <a href="https://delexoo.github.io/GitReplay/"><img src="https://img.shields.io/badge/Live_Demo-Open_GitReplay-2ea043?style=for-the-badge&logo=github&logoColor=white" alt="Open GitReplay" /></a>
   &nbsp;
   <a href="https://github.com/Delexoo/GitReplay/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
 </p>
 
 <p align="center">
-  <a href="https://delexoo.github.io/GitReplay/welcome.html"><img src="https://img.shields.io/badge/GitHub_Pages-delexoo.github.io%2FGitReplay-24292f?style=flat-square&logo=githubpages&logoColor=white" alt="GitHub Pages" /></a>
+  <a href="https://delexoo.github.io/GitReplay/"><img src="https://img.shields.io/badge/GitHub_Pages-delexoo.github.io%2FGitReplay-24292f?style=flat-square&logo=githubpages&logoColor=white" alt="GitHub Pages" /></a>
   <a href="https://github.com/Delexoo/GitReplay/actions/workflows/pages.yml"><img src="https://img.shields.io/github/actions/workflow/status/Delexoo/GitReplay/pages.yml?branch=main&style=flat-square&label=Pages%20deploy" alt="Pages deploy" /></a>
   <a href="https://github.com/Delexoo/GitReplay"><img src="https://img.shields.io/github/stars/Delexoo/GitReplay?style=flat-square&color=2ea043" alt="Stars" /></a>
   <a href="https://github.com/Delexoo/GitReplay/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Delexoo/GitReplay?style=flat-square" alt="License" /></a>
@@ -25,20 +25,20 @@
 
 ## Try it
 
-**Live app:** [https://delexoo.github.io/GitReplay/welcome.html](https://delexoo.github.io/GitReplay/welcome.html)
+**Live app:** [https://delexoo.github.io/GitReplay/](https://delexoo.github.io/GitReplay/)
 
 ### Embed / share
 
 Markdown badge:
 
 ```md
-[![Open GitReplay](https://img.shields.io/badge/Open-GitReplay-2ea043?style=for-the-badge&logo=github&logoColor=white)](https://delexoo.github.io/GitReplay/welcome.html)
+[![Open GitReplay](https://img.shields.io/badge/Open-GitReplay-2ea043?style=for-the-badge&logo=github&logoColor=white)](https://delexoo.github.io/GitReplay/)
 ```
 
 HTML badge:
 
 ```html
-<a href="https://delexoo.github.io/GitReplay/welcome.html" target="_blank" rel="noopener">
+<a href="https://delexoo.github.io/GitReplay/" target="_blank" rel="noopener">
   <img src="https://img.shields.io/badge/Open-GitReplay-2ea043?style=for-the-badge&logo=github&logoColor=white" alt="Open GitReplay" />
 </a>
 ```
@@ -53,7 +53,7 @@ Nothing to install. Open the link and start. Your session stays in this browser 
 
 | | |
 | --- | --- |
-| **Live app** | [delexoo.github.io/GitReplay](https://delexoo.github.io/GitReplay/welcome.html) |
+| **Live app** | [delexoo.github.io/GitReplay](https://delexoo.github.io/GitReplay/) |
 | **Source** | [github.com/Delexoo/GitReplay](https://github.com/Delexoo/GitReplay) |
 | **License** | [MIT](LICENSE) |
 | **Author** | [Delexoo](https://github.com/Delexoo) |
@@ -73,7 +73,7 @@ Nothing to install. Open the link and start. Your session stays in this browser 
 
 ## Quick start
 
-1. Open [GitReplay](https://delexoo.github.io/GitReplay/welcome.html)
+1. Open [GitReplay](https://delexoo.github.io/GitReplay/)
 2. Click **Connect with GitHub** and authorize the app
 3. Choose a repository from your list, or paste a URL such as `github.com/vitejs/vite`
 4. Single-click a file to read it · Double-click to replay it live
@@ -96,7 +96,7 @@ Full text: [LICENSE](LICENSE)
 ---
 
 <p align="center">
-  <a href="https://delexoo.github.io/GitReplay/welcome.html">Open GitReplay</a>
+  <a href="https://delexoo.github.io/GitReplay/">Open GitReplay</a>
   ·
   <a href="https://github.com/Delexoo/GitReplay">Source</a>
   ·

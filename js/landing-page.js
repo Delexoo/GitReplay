@@ -16,7 +16,7 @@ import {
   consumeOAuthState,
   consumePendingRepo,
   getCachedGitHubUser,
-  navigateToApp,
+  navigateToReplay,
   setCachedGitHubUser,
   setOAuthState,
   setPendingRepo,
@@ -108,7 +108,7 @@ function startGitHubConnect() {
   clearError();
   const state = randomState();
   setOAuthState(state);
-  const returnTo = new URL("welcome.html", location.href).href;
+  const returnTo = new URL("index.html", location.href).href;
   const login = new URL("/api/github/login", AUTH_API_ORIGIN);
   login.searchParams.set("return", returnTo);
   login.searchParams.set("state", state);
@@ -238,7 +238,7 @@ async function openRepo(url) {
       ? `https://github.com/${parsed.owner}/${parsed.repo}`
       : trimmed);
     setPendingRepo("");
-    navigateToApp();
+    navigateToReplay();
   } catch (err) {
     if (isRateLimitError(err)) {
       showError(err.message ?? "GitHub rate limit reached. Try again in a few minutes.");
