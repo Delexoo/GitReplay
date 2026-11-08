@@ -2,6 +2,6 @@
   "name": "gitreplay",
   "version": "1.0.0",
   "private": true,
-  "description": "Public web app — watch GitHub repos build live with session-based GitHub authentication",
+  "description": "Public web app — watch GitHub repos build live with GitHub account connect",
   "homepage": "https://delexoo.github.io/GitReplay/"
 }

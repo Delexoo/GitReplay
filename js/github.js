@@ -145,15 +145,15 @@ export function isRateLimitError(err) {
 function parseApiError(status, body) {
   if (status === 401) {
     if (hasUserGitHubToken()) {
-      return "Invalid GitHub token. Check your token and try again.";
+      return "GitHub session expired. Sign in again to continue.";
     }
-    return "GitHub authentication failed. Try again or add a personal access token.";
+    return "GitHub authentication failed. Connect your GitHub account to continue.";
   }
   if (status === 403 && body.includes("rate limit")) {
     if (hasUserGitHubToken()) {
-      return "GitHub rate limit reached on your token. Try again in a few minutes.";
+      return "GitHub rate limit reached. Try again in a few minutes.";
     }
-    return "GitHub rate limit reached. Add your GitHub token to continue.";
+    return "GitHub rate limit reached. Connect your GitHub account to continue.";
   }
   try {
     const json = JSON.parse(body);
@@ -212,6 +212,50 @@ function decodeBase64(content) {
   const binary = atob(cleaned);
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+export async function fetchCurrentUser() {
+  const data = await githubFetch("https://api.github.com/user");
+  return {
+    login: data.login,
+    name: data.name ?? data.login,
+    avatarUrl: data.avatar_url,
+    htmlUrl: data.html_url,
+  };
+}
+
+export async function fetchUserRepos({ maxPages = 3, perPage = 100 } = {}) {
+  const repos = [];
+  const seen = new Set();
+
+  for (let page = 1; page <= maxPages; page++) {
+    const batch = await githubFetch(
+      `https://api.github.com/user/repos?per_page=${perPage}&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`
+    );
+    if (!Array.isArray(batch) || batch.length === 0) break;
+
+    for (const repo of batch) {
+      const fullName = repo.full_name;
+      if (!fullName || seen.has(fullName)) continue;
+      seen.add(fullName);
+      repos.push({
+        fullName,
+        name: repo.name,
+        owner: repo.owner?.login ?? fullName.split("/")[0],
+        description: repo.description,
+        private: Boolean(repo.private),
+        language: repo.language,
+        updatedAt: repo.updated_at,
+        defaultBranch: repo.default_branch,
+        htmlUrl: repo.html_url,
+        stars: repo.stargazers_count ?? 0,
+      });
+    }
+
+    if (batch.length < perPage) break;
+  }
+
+  return repos;
 }
 
 export async function fetchRepoInfo(owner, repo) {
@@ -275,9 +319,12 @@ export async function fetchRepoTree(owner, repo, branch) {
 export async function fetchFileContent(owner, repo, filePath, ref) {
   const rawPath = filePath.split("/").map(encodeURIComponent).join("/");
   const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${rawPath}`;
+  const userToken = getUserGitHubToken();
 
-  const rawRes = await fetch(rawUrl);
-  if (rawRes.ok) return rawRes.text();
+  if (!userToken) {
+    const rawRes = await fetch(rawUrl);
+    if (rawRes.ok) return rawRes.text();
+  }
 
   const encodedPath = filePath
     .split("/")

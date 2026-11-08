@@ -39,16 +39,12 @@
             </div>
             <button id="replay-btn" type="button" class="btn" disabled title="Replay what you just watched">Replay</button>
           </div>
-          <button id="token-settings-btn" type="button" class="btn btn-ghost btn-secure" title="Add GitHub token for this tab (optional)">
-            <svg class="icon-secure" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <span class="btn-secure-label">Token</span>
-            <svg class="icon-secure-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-          </button>
+          <div id="account-chip" class="account-chip hidden">
+            <span id="account-label" class="account-label"></span>
+            <button id="sign-out-btn" type="button" class="btn btn-ghost" title="Sign out of GitHub for this tab">
+              Sign out
+            </button>
+          </div>
           <div id="replay-controls" class="replay-controls hidden">
             <button id="play-pause-btn" type="button" class="btn">Pause</button>
             <div class="replay-sliders">

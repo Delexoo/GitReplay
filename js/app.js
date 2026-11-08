@@ -1,5 +1,6 @@
 import {
   parseGitHubUrl,
+  fetchCurrentUser,
   fetchRepoInfo,
   fetchRepoTree,
   fetchFileContent,
@@ -11,10 +12,10 @@ import {
   validateUserGitHubToken,
 } from "./github.js";
 import {
+  getCachedGitHubUser,
   getRepoUrl,
-  navigateToToken,
   navigateToWelcome,
-  setPendingRepo,
+  setCachedGitHubUser,
   setRepoUrl,
 } from "./session-nav.js";
 import { createPreviewController, isWebFile, isPreviewableMedia, getPreviewMediaKind, isScriptPath, isStylePath, pickBundleEntry, scoreHtmlPath } from "./preview.js";
@@ -104,7 +105,9 @@ const els = {
   previewReplayDock: document.getElementById("preview-replay-dock"),
   previewEmpty: document.getElementById("preview-empty"),
   previewStatus: document.getElementById("preview-status"),
-  tokenSettingsBtn: document.getElementById("token-settings-btn"),
+  accountChip: document.getElementById("account-chip"),
+  accountLabel: document.getElementById("account-label"),
+  signOutBtn: document.getElementById("sign-out-btn"),
 };
 
 const replayControlsHome = {
@@ -161,29 +164,52 @@ const preview = createPreviewController(
 
 function handleApiError(err, fallback = "Request failed") {
   if (isRateLimitError(err)) {
-    const url = els.repoInput.value.trim();
-    if (url) setPendingRepo(url);
-    navigateToToken({ reason: "rateLimit", returnTo: "index.html" });
-    showError(err.message ?? "GitHub rate limit reached. Add your token to continue.");
+    showError(err.message ?? "GitHub rate limit reached. Try again in a few minutes.");
     return true;
   }
   showError(err?.message ?? fallback);
   return false;
 }
 
-function updateTokenUI() {
-  els.tokenSettingsBtn.classList.toggle("is-connected", hasUserGitHubToken());
-  els.tokenSettingsBtn.title = hasUserGitHubToken()
-    ? "GitHub token connected for this tab — click to change"
-    : "Add GitHub token for this tab (optional)";
+function updateAccountUI(user = getCachedGitHubUser()) {
+  const connected = hasUserGitHubToken();
+  els.accountChip?.classList.toggle("hidden", !connected);
+  if (els.accountLabel) {
+    els.accountLabel.textContent = user?.login ? `@${user.login}` : connected ? "Connected" : "";
+  }
+}
+
+function signOut() {
+  setUserGitHubToken("");
+  setCachedGitHubUser(null);
+  setRepoUrl("");
+  navigateToWelcome();
 }
 
 async function bootWorkspace() {
-  if (hasUserGitHubToken()) {
-    const result = await validateUserGitHubToken(getUserGitHubToken());
-    if (!result.valid && !result.networkError) clearInvalidUserToken();
+  if (!hasUserGitHubToken()) {
+    navigateToWelcome();
+    return;
   }
-  updateTokenUI();
+
+  const result = await validateUserGitHubToken(getUserGitHubToken());
+  if (!result.valid && !result.networkError) {
+    clearInvalidUserToken();
+    setCachedGitHubUser(null);
+    navigateToWelcome();
+    return;
+  }
+
+  let user = getCachedGitHubUser();
+  if (!user && result.valid) {
+    try {
+      user = await fetchCurrentUser();
+      setCachedGitHubUser(user);
+    } catch {
+      /* profile is optional for playing a repo */
+    }
+  }
+  updateAccountUI(user);
 
   const url = getRepoUrl();
   if (!url) {
@@ -3190,12 +3216,9 @@ async function loadRepository() {
     updateHeaderActions();
     updateFileTree();
     updateReplayUI();
-    updateTokenUI();
+    updateAccountUI();
     updateDisplay();
   } catch (err) {
-    if (isRateLimitError(err)) {
-      setPendingRepo(url);
-    }
     if (!handleApiError(err, "Failed to load repository") && !state.repoInfo) {
       navigateToWelcome();
     }
@@ -3249,12 +3272,12 @@ els.startBtn.addEventListener("click", loadRepository);
 els.replayAllBtn.addEventListener("click", replayAllFiles);
 els.raceBtn.addEventListener("click", startRace);
 els.replayBtn.addEventListener("click", replayCurrent);
-els.tokenSettingsBtn.addEventListener("click", () => {
-  navigateToToken({ reason: "voluntary", returnTo: "index.html" });
-});
+els.signOutBtn?.addEventListener("click", signOut);
 window.addEventListener("gitreplay:token-cleared", () => {
-  updateTokenUI();
-  showError("Your GitHub token was invalid and has been removed for this tab.");
+  setCachedGitHubUser(null);
+  updateAccountUI(null);
+  showError("Your GitHub session was invalid and has been signed out.");
+  navigateToWelcome();
 });
 els.repoInput.addEventListener("keydown", (e) => e.key === "Enter" && loadRepository());
 els.playPauseBtn.addEventListener("click", togglePlayPause);

@@ -13,3 +13,5 @@ src/
 server/
 vite.config.ts
 tsconfig.json
+.vercel
+.env*

@@ -84,7 +84,7 @@ body {
 }
 
 .navbar-prompt .navbar-inner {
-  justify-content: flex-start;
+  justify-content: space-between;
 }
 
 body.prompt-page .welcome {
@@ -309,6 +309,10 @@ body.prompt-page .welcome {
   text-align: center;
 }
 
+#landing-connected.welcome-screen {
+  max-width: 520px;
+}
+
 .welcome-screen.hidden {
   display: none;
 }
@@ -408,6 +412,157 @@ body.prompt-page .welcome {
 
 .welcome-back:hover {
   color: var(--fg);
+}
+
+.welcome-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.btn-connect {
+  height: 44px;
+  min-width: 200px;
+  padding: 0 24px;
+  font-size: 14px;
+}
+
+.account-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.repo-picker {
+  margin-top: 28px;
+  text-align: left;
+}
+
+.repo-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.repo-picker-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.repo-picker-head input[type="search"] {
+  width: min(180px, 46%);
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+}
+
+.repo-picker-head input[type="search"]:focus {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+.repo-list {
+  max-height: min(360px, 46vh);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.repo-list-empty {
+  margin: 0;
+  padding: 20px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.repo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.repo-item:last-child {
+  border-bottom: none;
+}
+
+.repo-item:hover,
+.repo-item:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.repo-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repo-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.repo-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.repo-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.repo-meta {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-chip .account-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Workspace ──────────────────────────────────────── */
