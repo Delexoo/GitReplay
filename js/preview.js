@@ -634,6 +634,7 @@ export function buildPreviewDocument(fileCache, activePath, options = {}) {
         if (!css.trim()) continue;
         blocks.push({
           id: "site",
+          name: cssPath.split("/").pop() || cssPath,
           css: resolveAssetUrl ? rewriteUrlInCssText(css, cssPath, resolveAssetUrl) : css,
         });
       }
@@ -961,7 +962,10 @@ function injectStyleBlocks(html, blocks, { deferred = false } = {}) {
   const media = deferred ? ' media="not all"' : "";
   const tags = blocks
     .filter((block) => block.css?.trim())
-    .map((block) => `<style data-gitreplay-${block.id}${media}>${escapeStyleText(block.css)}</style>`)
+    .map((block) => {
+      const name = block.name ? ` data-gitreplay-name="${escapeAttr(block.name)}"` : "";
+      return `<style data-gitreplay-${block.id}${name}${media}>${escapeStyleText(block.css)}</style>`;
+    })
     .join("");
   if (!tags) return html;
   if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${tags}</head>`);

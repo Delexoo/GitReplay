@@ -20,26 +20,17 @@ html.gitreplay-assembling.gitreplay-instant .gitreplay-piece {
 }
 `;
 
-const PIECE_TAGS = new Set([
+const ATOMIC_TAGS = new Set([
   "IMG",
   "VIDEO",
   "SVG",
   "CANVAS",
   "PICTURE",
   "BUTTON",
-  "H1",
-  "H2",
-  "H3",
-  "H4",
-  "H5",
-  "H6",
-  "P",
-  "LI",
-  "FIGCAPTION",
-  "BLOCKQUOTE",
   "INPUT",
   "TEXTAREA",
   "SELECT",
+  "IFRAME",
 ]);
 
 function isSkippable(el) {
@@ -113,25 +104,12 @@ function collectPieces(body) {
   function walk(el) {
     if (!el || el.nodeType !== 1 || isSkippable(el) || !isShown(el)) return;
     const kids = [...el.children].filter((child) => !isSkippable(child) && isShown(child));
-    const rect = el.getBoundingClientRect();
     const tag = el.tagName;
 
-    if (PIECE_TAGS.has(tag)) {
-      pieces.push(el);
-      return;
-    }
-
-    const splits =
-      kids.length >= 2 &&
-      (rect.height > 260 || tag === "MAIN" || tag === "BODY" || tag === "SECTION" || tag === "ARTICLE");
-
-    if (splits) {
-      for (const kid of kids) walk(kid);
-      return;
-    }
-
-    if (rect.height >= 12) {
-      pieces.push(el);
+    if (ATOMIC_TAGS.has(tag) || kids.length === 0) {
+      const rect = el.getBoundingClientRect();
+      const text = (el.textContent || "").trim();
+      if (rect.width >= 2 && rect.height >= 2 && (text || ATOMIC_TAGS.has(tag))) pieces.push(el);
       return;
     }
 
@@ -140,37 +118,6 @@ function collectPieces(body) {
 
   for (const child of body.children) walk(child);
   return pieces;
-}
-
-function clusterPieces(pieces) {
-  const groups = [];
-  let bucket = [];
-
-  const flush = () => {
-    if (!bucket.length) return;
-    groups.push(bucket);
-    bucket = [];
-  };
-
-  for (const el of pieces) {
-    const rect = el.getBoundingClientRect();
-    const tiny = rect.height > 0 && rect.height <= 56;
-    const previous = bucket[bucket.length - 1];
-    if (
-      tiny &&
-      previous &&
-      previous.parentElement === el.parentElement &&
-      bucket.length < 6
-    ) {
-      bucket.push(el);
-      continue;
-    }
-    flush();
-    bucket = [el];
-    if (!tiny) flush();
-  }
-  flush();
-  return groups;
 }
 
 function followPiece(el) {
@@ -225,7 +172,7 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
   injectDirectorStyle(doc);
 
   const pieces = collectPieces(doc.body);
-  const groups = clusterPieces(pieces).filter((group) => group.length);
+  const groups = pieces.map((el) => [el]);
   const siteStyles = [...doc.querySelectorAll("style[data-gitreplay-site]")];
   const pageScripts = scripts.filter((script) => script?.content?.trim());
   if (!groups.length && !siteStyles.length && !pageScripts.length) return null;
@@ -245,79 +192,64 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
         if (ctx.isCancelled()) return;
         for (const el of group) el.classList.add("gitreplay-in");
         followPiece(group[0]);
-        await wait(scaled(380, ctx.speed), ctx.isCancelled);
+        await wait(scaled(240, ctx.speed), ctx.isCancelled);
       },
     };
   });
 
-  let scriptsStarted = false;
-  const startScripts = () => {
-    if (scriptsStarted || !pageScripts.length) return;
-    scriptsStarted = true;
-    for (const script of pageScripts) {
-      const el = doc.createElement("script");
-      if (script.module) el.type = "module";
-      el.textContent = script.content;
-      doc.body.appendChild(el);
+  const scriptsStarted = new Set();
+  const startScripts = (index) => {
+    if (index == null) {
+      pageScripts.forEach((_, scriptIndex) => startScripts(scriptIndex));
+      return;
     }
+    if (scriptsStarted.has(index)) return;
+    const script = pageScripts[index];
+    if (!script?.content?.trim()) return;
+    scriptsStarted.add(index);
+    const el = doc.createElement("script");
+    if (script.module) el.type = "module";
+    el.textContent = script.content;
+    doc.body.appendChild(el);
   };
 
-  const setStyles = (on) => {
-    for (const style of siteStyles) {
-      if (on) style.removeAttribute("media");
+  const setStyles = (count) => {
+    siteStyles.forEach((style, index) => {
+      if (index < count) style.removeAttribute("media");
       else style.setAttribute("media", "not all");
-    }
+    });
   };
 
-  if (siteStyles.length) {
+  siteStyles.forEach((style, index) => {
+    const name = style.getAttribute("data-gitreplay-name") || `stylesheet ${index + 1}`;
     beats.push({
       label: "Applying styles",
-      detail: siteStyles.length === 1 ? "CSS" : `${siteStyles.length} stylesheets`,
+      detail: name,
       commit() {
-        setStyles(true);
+        style.removeAttribute("media");
       },
       async play(ctx) {
         if (ctx.isCancelled()) return;
-        const root = doc.documentElement;
-        const restore = () => {
-          root.style.opacity = "";
-          root.style.transition = "";
-        };
-        root.style.transition = "opacity 0.35s ease";
-        root.style.opacity = "0.02";
-        await wait(scaled(220, ctx.speed), ctx.isCancelled);
-        if (ctx.isCancelled()) {
-          restore();
-          return;
-        }
-        setStyles(true);
-        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        if (ctx.isCancelled()) {
-          restore();
-          return;
-        }
-        root.style.opacity = "1";
-        await wait(scaled(560, ctx.speed), ctx.isCancelled);
-        root.style.transition = "";
+        style.removeAttribute("media");
+        await wait(scaled(320, ctx.speed), ctx.isCancelled);
       },
     });
-  }
+  });
 
-  if (pageScripts.length) {
-    const names = pageScripts.map((script) => script.name).filter(Boolean);
+  pageScripts.forEach((script, index) => {
     beats.push({
       label: "Starting scripts",
-      detail: names.length === 1 ? names[0] : `${pageScripts.length} files`,
+      detail: script.name || `script ${index + 1}`,
       commit() {
-        startScripts();
+        startScripts(index);
       },
       async play(ctx) {
         if (ctx.isCancelled()) return;
-        startScripts();
-        await wait(scaled(480, ctx.speed), ctx.isCancelled);
+        startScripts(index);
+        await wait(scaled(280, ctx.speed), ctx.isCancelled);
       },
     });
-  }
+  });
 
   const pieceCount = groups.length;
 
@@ -329,8 +261,12 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
       groups.forEach((group, index) => {
         for (const el of group) el.classList.toggle("gitreplay-in", index < Math.min(end, pieceCount));
       });
-      setStyles(end > pieceCount);
-      if (end > pieceCount + (siteStyles.length ? 1 : 0)) startScripts();
+      const styleCount = Math.max(0, Math.min(siteStyles.length, end - pieceCount));
+      setStyles(styleCount);
+      const scriptStart = pieceCount + siteStyles.length;
+      for (let index = 0; index < pageScripts.length; index += 1) {
+        if (end > scriptStart + index) startScripts(index);
+      }
       doc.documentElement.classList.remove("gitreplay-instant");
       const current = groups[Math.min(end, pieceCount) - 1]?.[0];
       if (current) followPiece(current);
@@ -340,7 +276,7 @@ export function createVisualEditShow(doc, { scripts = [] } = {}) {
       doc.documentElement.style.opacity = "";
       doc.documentElement.style.transition = "";
       for (const el of pieces) el.classList.remove("gitreplay-piece", "gitreplay-in");
-      setStyles(true);
+      setStyles(siteStyles.length);
       doc.getElementById("gitreplay-director-style")?.remove();
     },
   };
