@@ -29,6 +29,7 @@ import {
 import { initPanelResize, initStackResize, equalizeStackSplit, equalizeWorkspacePanels } from "./resize.js";
 import { analyzeRepo, findPackageJsonPath, findReadmePath } from "./repo-analyze.js";
 import { createExperiencePrompt, renderSiteTourPages, setDesktopChrome } from "./experience.js";
+import { createVisualEditShow, waitForPreviewImages } from "./visual-replay.js";
 
 const state = {
   parsed: null,
@@ -70,6 +71,7 @@ const state = {
   progressScrubbing: false,
   scrubWasPlaying: false,
   scrubBookmark: null,
+  visualReplay: null,
 };
 
 let replayAllSeekGen = 0;
@@ -108,6 +110,7 @@ const els = {
   previewFullscreenBtn: document.getElementById("preview-fullscreen-btn"),
   previewBuilding: document.getElementById("preview-building"),
   previewReplayDock: document.getElementById("preview-replay-dock"),
+  previewEditCaption: document.getElementById("preview-edit-caption"),
   previewEmpty: document.getElementById("preview-empty"),
   previewStatus: document.getElementById("preview-status"),
   accountChip: document.getElementById("account-chip"),
@@ -129,6 +132,7 @@ const replayControlsHome = {
 };
 
 function isPreviewBuilding() {
+  if (state.visualReplay) return false;
   if (state.viewMode !== "replay" || !state.isPlaying || state.progressScrubbing) return false;
   if (els.previewFrame.classList.contains("hidden-frame")) return false;
 
@@ -196,6 +200,7 @@ function syncWorkspaceLayout() {
 }
 
 function clearExperienceChrome() {
+  stopVisualReplay();
   state.experienceMode = null;
   state.siteTour = null;
   setDesktopChrome(false, {
@@ -1044,6 +1049,15 @@ function getReplayAllProgressTarget() {
 function getReplayProgressTarget() {
   if (state.viewMode !== "replay") return null;
 
+  if (state.visualReplay?.beats?.length) {
+    return {
+      kind: "visual",
+      index: state.visualReplay.index,
+      length: state.visualReplay.beats.length,
+      label: state.visualReplay.label || "",
+    };
+  }
+
   if (state.replayAllMode && state.replayAllPaths?.length) {
     return getReplayAllProgressTarget();
   }
@@ -1068,6 +1082,10 @@ function getReplayProgressTarget() {
 }
 
 function formatProgressLabel(ratio, target = null) {
+  if (target?.kind === "visual") {
+    const pct = Math.min(100, Math.round(ratio * 100));
+    return target.label ? `${target.label} · ${pct}%` : `${pct}%`;
+  }
   if (target?.kind === "replayAll") {
     const fileCount = target.fileCount;
     if (ratio >= 1) return `${fileCount}/${fileCount}`;
@@ -1155,6 +1173,11 @@ function applyReplayProgress(ratio) {
 
   if (state.replayAllMode && state.replayAllPaths?.length) {
     void applyReplayAllProgress(clamped);
+    return;
+  }
+
+  if (state.visualReplay?.beats?.length) {
+    seekVisualReplay(clamped);
     return;
   }
 
@@ -1252,7 +1275,8 @@ function endProgressScrub() {
 }
 
 function resumeReplayLoop() {
-  if (state.parallelWeb) runParallelWebLoop();
+  if (state.visualReplay) resumeVisualReplay();
+  else if (state.parallelWeb) runParallelWebLoop();
   else if (state.raceMode) runRaceLoop();
   else runTypingLoop();
 }
@@ -2355,6 +2379,11 @@ function clearTimers() {
   state.typingTimer = null;
   state.stepPauseTimer = null;
   state.charAccumulator = 0;
+  if (state.visualReplay) {
+    state.visualReplay.token += 1;
+    if (state.visualReplay.timer) clearTimeout(state.visualReplay.timer);
+    state.visualReplay.timer = null;
+  }
 }
 
 function fillPreviewCache(path, content) {
@@ -3073,7 +3102,215 @@ function buildWebTargets(activePath) {
   };
 }
 
+function hideEditCaption() {
+  if (!els.previewEditCaption) return;
+  els.previewEditCaption.classList.add("hidden");
+  els.previewEditCaption.textContent = "";
+}
+
+function showEditCaption(label, detail) {
+  if (!els.previewEditCaption) return;
+  const text = detail ? `${label} · ${detail}` : label;
+  els.previewEditCaption.textContent = text;
+  els.previewEditCaption.classList.remove("hidden");
+  if (els.previewStatus) els.previewStatus.textContent = text;
+}
+
+function stopVisualReplay() {
+  const session = state.visualReplay;
+  if (session) {
+    session.token += 1;
+    if (session.timer) clearTimeout(session.timer);
+    try {
+      session.show?.cleanup();
+    } catch {
+      /* the preview frame may already have moved on */
+    }
+  }
+  state.visualReplay = null;
+  preview.setHold(false);
+  hideEditCaption();
+}
+
+function pauseVisualClock() {
+  const session = state.visualReplay;
+  if (!session) return;
+  session.token += 1;
+  if (session.timer) clearTimeout(session.timer);
+  session.timer = null;
+}
+
+function seekVisualReplay(ratio) {
+  const session = state.visualReplay;
+  if (!session?.beats?.length) return;
+  pauseVisualClock();
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const count = Math.round(clamped * session.beats.length);
+  session.show.renderInstant(count);
+  session.index = count;
+  const beat = session.beats[Math.min(session.beats.length, count) - 1];
+  session.label = beat?.label ?? "";
+  if (beat) showEditCaption(beat.label, beat.detail);
+  else showEditCaption("Starting the page", "");
+  els.progressLabel.textContent = formatProgressLabel(clamped, {
+    kind: "visual",
+    label: session.label,
+  });
+}
+
+async function playNextVisualBeat(session) {
+  const token = session.token;
+  if (!state.isPlaying || state.visualReplay !== session || state.progressScrubbing) return;
+  if (session.index >= session.beats.length) {
+    await finishVisualReplay(session);
+    return;
+  }
+
+  const beat = session.beats[session.index];
+  session.label = beat.label;
+  showEditCaption(beat.label, beat.detail);
+  updateProgressSlider();
+  await beat.play({
+    speed: state.replaySpeed,
+    isCancelled: () => session.token !== token || state.visualReplay !== session,
+  });
+  if (session.token !== token || state.visualReplay !== session || !state.isPlaying) return;
+  session.index += 1;
+  updateProgressSlider();
+  session.timer = setTimeout(() => {
+    void playNextVisualBeat(session);
+  }, 36);
+}
+
+function resumeVisualReplay() {
+  const session = state.visualReplay;
+  if (!session || !state.isPlaying) return;
+  pauseVisualClock();
+  void playNextVisualBeat(session);
+}
+
+async function finishVisualReplay(session) {
+  if (!session || session.finished || state.visualReplay !== session) return;
+  session.finished = true;
+  session.token += 1;
+  const htmlPath = session.htmlPath;
+  try {
+    session.show.cleanup();
+  } catch {
+    /* remount replaces this document */
+  }
+  preview.setHold(false);
+  state.visualReplay = null;
+  state.isPlaying = false;
+  hideEditCaption();
+
+  if (state.parallelWeb) {
+    for (const file of state.parallelWeb.files) {
+      file.i = file.full.length;
+      preview.setFile(file.path, file.full);
+    }
+  }
+  const htmlFile = state.parallelWeb?.files.find((file) => file.path === htmlPath);
+  state.replayPath = htmlPath;
+  state.replayContent = htmlFile?.full ?? state.loadedFiles.get(htmlPath) ?? "";
+  preview.invalidate();
+  try {
+    await preview.refreshAsync(
+      htmlPath,
+      previewRefreshOptions({
+        liveBuild: false,
+        forceMount: true,
+        bundle: getPreviewBundle(),
+      })
+    );
+  } catch {
+    /* the edited page is already on screen */
+  }
+  state.parallelWeb = null;
+  updateReplayUI();
+
+  if (state.experienceMode === "site" && state.siteTour) {
+    window.setTimeout(() => {
+      void advanceSiteTour();
+    }, 900);
+  }
+}
+
+async function runVisualEditReplay() {
+  const htmlPath = state.parallelWeb?.htmlPath;
+  if (!htmlPath || !state.parallelWeb) return false;
+
+  preview.setHold(true);
+  showEditCaption("Setting the stage", "");
+  const ready = preview.whenDocumentReady();
+  for (const file of state.parallelWeb.files) preview.setFile(file.path, file.full);
+
+  try {
+    await preview.refreshAsync(
+      htmlPath,
+      previewRefreshOptions({
+        liveBuild: false,
+        forceMount: true,
+        skipScripts: true,
+        bundle: getPreviewBundle(),
+      })
+    );
+    const doc = await Promise.race([
+      ready,
+      new Promise((resolve) => setTimeout(() => resolve(null), 8000)),
+    ]);
+    if (!state.isPlaying || !state.parallelWeb || state.parallelWeb.htmlPath !== htmlPath) {
+      preview.setHold(false);
+      return false;
+    }
+    if (!doc?.body) {
+      preview.setHold(false);
+      return false;
+    }
+
+    await waitForPreviewImages(doc);
+    const show = createVisualEditShow(doc);
+    if (!show || !state.parallelWeb) {
+      preview.setHold(false);
+      return false;
+    }
+
+    state.visualReplay = {
+      beats: show.beats,
+      index: 0,
+      token: 1,
+      timer: null,
+      label: show.beats[0]?.label ?? "",
+      htmlPath,
+      show,
+      finished: false,
+    };
+    preview.setHold(false);
+    updateReplayUI();
+    if (state.isPlaying) void playNextVisualBeat(state.visualReplay);
+    return true;
+  } catch (err) {
+    console.warn("GitReplay visual replay failed:", err);
+    preview.setHold(false);
+    return false;
+  }
+}
+
+function startCharacterWebReplay(targets) {
+  preview.beginLiveBuild();
+  for (const file of targets.files) preview.setFile(file.path, "");
+  if (state.parallelWeb) {
+    for (const file of state.parallelWeb.files) file.i = 0;
+  }
+  renderTimeline();
+  renderParallelWebCode(true);
+  refreshPreviewForPath(targets.htmlPath, "", true);
+  syncParallelPreview();
+  runParallelWebLoop();
+}
+
 function startParallelWebReplay(targets) {
+  stopVisualReplay();
   clearTimers();
   clearReplayAllSession();
   state.parallelWeb = {
@@ -3099,14 +3336,18 @@ function startParallelWebReplay(targets) {
   state.lastTimelineRefresh = 0;
 
   for (const f of targets.files) ensureFolderExpanded(f.path);
-  preview.beginLiveBuild();
-  for (const f of targets.files) preview.setFile(f.path, "");
   updateReplayUI();
-  renderTimeline();
-  renderParallelWebCode(true);
-  refreshPreviewForPath(targets.htmlPath, "", true);
-  syncParallelPreview();
-  runParallelWebLoop();
+
+  if (isPreviewOnlyExperience()) {
+    void runVisualEditReplay().then((ok) => {
+      if (!ok && state.isPlaying && state.parallelWeb && !state.visualReplay) {
+        startCharacterWebReplay(targets);
+      }
+    });
+    return;
+  }
+
+  startCharacterWebReplay(targets);
 }
 
 function makeFileStep(index, path, content) {
@@ -3479,6 +3720,11 @@ async function loadRepository() {
 function togglePlayPause() {
   state.isPlaying = !state.isPlaying;
   updateReplayUI();
+  if (state.visualReplay) {
+    if (state.isPlaying) resumeVisualReplay();
+    else pauseVisualClock();
+    return;
+  }
   if (state.isPlaying) {
     if (state.raceMode) runRaceLoop();
     else if (state.parallelWeb) runParallelWebLoop();

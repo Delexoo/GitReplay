@@ -481,12 +481,18 @@ function injectBundledPreview(html, bundle) {
   return injectJs(doc, payload.js, { module: true });
 }
 
+function stripExecutableScripts(html) {
+  return html
+    .replace(/<script\b[^>]*\bsrc\s*=\s*(["'])[\s\S]*?\1[^>]*>\s*<\/script>/gi, "")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+}
+
 function buildAuthenticPreviewDocument(html, htmlPath, resolveAssetUrl, options = {}) {
-  const { bundledScript = null, fileCache = null } = options;
-  let doc = ensureDoctype(html);
+  const { bundledScript = null, fileCache = null, skipScripts = false } = options;
+  let doc = ensureDoctype(skipScripts ? stripExecutableScripts(html) : html);
   doc = sanitizeDevAssets(doc);
 
-  if (normalizeBundledPreview(bundledScript) && htmlPath && fileCache) {
+  if (!skipScripts && normalizeBundledPreview(bundledScript) && htmlPath && fileCache) {
     doc = stripInlinedLocalAssets(doc, htmlPath, fileCache);
     if (resolveAssetUrl && htmlPath) {
       doc = rewriteAssetUrls(doc, htmlPath, resolveAssetUrl);
@@ -585,6 +591,7 @@ export function buildPreviewDocument(fileCache, activePath, options = {}) {
     mediaUrl = null,
     resolveAssetUrl = null,
     bundledScript = null,
+    skipScripts = false,
   } = options;
   if (!fileCache.size && !mediaUrl) return null;
 
@@ -606,15 +613,16 @@ export function buildPreviewDocument(fileCache, activePath, options = {}) {
   if (stack.html.length > 0) {
     if (liveBuild) {
       return buildLivePreviewDocument(stack.html, stack, fileCache, {
-        allowPartialJs,
+        allowPartialJs: allowPartialJs && !skipScripts,
         allowPartialCss,
         resolveAssetUrl,
-        bundledScript,
+        bundledScript: skipScripts ? null : bundledScript,
       });
     }
     return buildAuthenticPreviewDocument(stack.html, stack.htmlPath, resolveAssetUrl, {
-      bundledScript,
+      bundledScript: skipScripts ? null : bundledScript,
       fileCache,
+      skipScripts,
     });
   }
 
@@ -988,6 +996,7 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
   let liveFlushTimer = null;
   let pendingLiveDoc = null;
   let liveShellReady = false;
+  let frameReadyWaiters = [];
 
   const LIVE_FLUSH_MS = 80;
   const BUILDING_DOC =
@@ -1347,6 +1356,9 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
     frameEl.onload = () => {
       if (prevUrl && prevUrl !== blobUrl) URL.revokeObjectURL(prevUrl);
       frameEl.onload = null;
+      const waiters = frameReadyWaiters;
+      frameReadyWaiters = [];
+      for (const resolve of waiters) resolve(frameEl.contentDocument);
     };
     frameEl.src = nextUrl;
     blobUrl = nextUrl;
@@ -1365,6 +1377,7 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
       mediaUrl = null,
       resolveAssetUrl = null,
       bundledScript = null,
+      skipScripts = false,
     } = options;
     const wasLiveBuild = liveBuildActive;
     liveBuildActive = liveBuild;
@@ -1378,6 +1391,7 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
       mediaUrl,
       resolveAssetUrl,
       bundledScript,
+      skipScripts,
     });
 
     if (!doc) {
@@ -1474,14 +1488,15 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
       !options.fullEntryLength ||
       (entry && (fileCache.get(entry)?.length ?? 0) >= options.fullEntryLength);
 
-    if (needsBundle && entryComplete && !options.bundledScript) {
+    if (!options.skipScripts && needsBundle && entryComplete && !options.bundledScript) {
       statusEl.textContent = "Bundling…";
     }
 
-    const bundledScript =
-      options.bundledScript ?? (await resolvePreviewBundle(activePath, options));
+    const bundledScript = options.skipScripts
+      ? null
+      : (options.bundledScript ?? (await resolvePreviewBundle(activePath, options)));
 
-    if (!normalizeBundledPreview(bundledScript) && needsBundle && entryComplete) {
+    if (!options.skipScripts && !normalizeBundledPreview(bundledScript) && needsBundle && entryComplete) {
       const errDoc = buildBundleErrorDocument(
         stack.htmlPath,
         entry,
@@ -1569,6 +1584,16 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
     }
   }
 
+  function whenDocumentReady() {
+    return new Promise((resolve) => {
+      frameReadyWaiters.push(resolve);
+    });
+  }
+
+  function setHold(held) {
+    frameEl.classList.toggle("preview-holding", Boolean(held));
+  }
+
   return {
     setFile,
     refresh,
@@ -1578,6 +1603,8 @@ export function createPreviewController(frameEl, emptyEl, statusEl) {
     clear,
     invalidate,
     beginLiveBuild,
+    whenDocumentReady,
+    setHold,
     fileCache,
     getWebStack: (activePath, opts = {}) => getWebStack(fileCache, activePath, opts),
     hasDocument: () => hasDocument,

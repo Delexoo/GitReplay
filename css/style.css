@@ -1436,6 +1436,39 @@ body.is-resizing {
   display: none;
 }
 
+#preview-frame.preview-holding {
+  visibility: hidden;
+}
+
+.preview-edit-caption {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 28px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(76, 29, 149, 0.92);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  pointer-events: none;
+  transform: translateX(-50%);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(76, 29, 149, 0.28);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-edit-caption.hidden {
+  display: none;
+}
+
 .preview-empty {
   position: absolute;
   inset: 0;
